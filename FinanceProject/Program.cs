@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using OfficeOpenXml;
 using DinkToPdf;
 using DinkToPdf.Contracts;
+using FinanceManager.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -82,16 +83,36 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<ApplicationDbContext>();
-        if (context.Database.GetPendingMigrations().Any())
+
+        // Drop the database if it exists
+        await context.Database.EnsureDeletedAsync();
+
+        // Create the database and apply migrations
+        await context.Database.EnsureCreatedAsync();
+
+        // Add default categories
+        if (!context.Categories.Any())
         {
-            context.Database.Migrate();
+            var defaultCategories = new List<Category>
+            {
+                new Category { Name = "Housing", Description = "Rent, Mortgage, Utilities", Type = CategoryType.Expense, ColorCode = "#FF5733", IsSystem = true },
+                new Category { Name = "Food", Description = "Groceries and Dining", Type = CategoryType.Expense, ColorCode = "#33FF57", IsSystem = true },
+                new Category { Name = "Transportation", Description = "Car, Gas, Public Transit", Type = CategoryType.Expense, ColorCode = "#3357FF", IsSystem = true },
+                new Category { Name = "Income", Description = "Salary and Other Income", Type = CategoryType.Income, ColorCode = "#57FF33", IsSystem = true }
+            };
+
+            await context.Categories.AddRangeAsync(defaultCategories);
+            await context.SaveChangesAsync();
         }
-        await DbInitializer.Initialize(context);
+
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogInformation("Database initialized successfully");
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while migrating or seeding the database.");
+        logger.LogError(ex, "An error occurred while initializing the database.");
+        throw; // Re-throw to prevent the app from starting with an invalid database
     }
 }
 
