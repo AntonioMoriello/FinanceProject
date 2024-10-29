@@ -91,10 +91,15 @@ namespace FinanceManager.Services
             if (endDate.HasValue)
                 query = query.Where(t => t.Date <= endDate.Value);
 
-            return await query
+            // Execute query and perform aggregation in memory
+            var transactions = await query.ToListAsync();
+
+            return transactions
                 .GroupBy(t => t.Category.Name)
-                .Select(g => new { Category = g.Key, Total = g.Sum(t => t.Amount) })
-                .ToDictionaryAsync(x => x.Category, x => x.Total);
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Sum(t => t.Amount)
+                );
         }
 
         public async Task<(decimal income, decimal expenses)> GetTotalsByTypeAsync(int userId, DateTime? startDate = null, DateTime? endDate = null)
@@ -107,15 +112,18 @@ namespace FinanceManager.Services
             if (endDate.HasValue)
                 query = query.Where(t => t.Date <= endDate.Value);
 
-            var totals = await query
-                .GroupBy(t => t.Type)
-                .Select(g => new { Type = g.Key, Total = g.Sum(t => t.Amount) })
-                .ToDictionaryAsync(x => x.Type, x => x.Total);
+            // Execute query and perform aggregation in memory
+            var transactions = await query.ToListAsync();
 
-            return (
-                totals.GetValueOrDefault(TransactionType.Income),
-                totals.GetValueOrDefault(TransactionType.Expense)
-            );
+            var income = transactions
+                .Where(t => t.Type == TransactionType.Income)
+                .Sum(t => t.Amount);
+
+            var expenses = transactions
+                .Where(t => t.Type == TransactionType.Expense)
+                .Sum(t => t.Amount);
+
+            return (income, expenses);
         }
 
         public async Task ProcessRecurringTransactionsAsync()

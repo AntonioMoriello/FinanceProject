@@ -45,22 +45,13 @@ namespace FinanceManager.Controllers
                 EndDate = endDate,
                 CategoryId = categoryId,
                 Type = type,
-                Categories = await _context.Categories.Where(c => c.UserId == userId).ToListAsync()
+                Categories = await _context.Categories
+                    .Where(c => c.UserId == userId || c.IsSystem)  // Include both user's and system categories
+                    .OrderBy(c => c.Name)
+                    .ToListAsync()
             };
 
             return View(viewModel);
-        }
-
-        // GET: Transactions/Details/5
-        public async Task<IActionResult> Details(int id)
-        {
-            var userId = GetUserId();
-            var transaction = await _transactionService.GetTransactionByIdAsync(id, userId);
-
-            if (transaction == null)
-                return NotFound();
-
-            return View(transaction);
         }
 
         // GET: Transactions/Create
@@ -70,7 +61,10 @@ namespace FinanceManager.Controllers
             var viewModel = new TransactionCreateViewModel
             {
                 Date = DateTime.Today,
-                Categories = await _context.Categories.Where(c => c.UserId == userId).ToListAsync()
+                Categories = await _context.Categories
+                    .Where(c => c.UserId == userId || c.IsSystem)  // Include both user's and system categories
+                    .OrderBy(c => c.Name)
+                    .ToListAsync()
             };
 
             return View(viewModel);
@@ -93,14 +87,19 @@ namespace FinanceManager.Controllers
                     Type = viewModel.Type,
                     IsRecurring = viewModel.IsRecurring,
                     RecurrencePattern = viewModel.RecurrencePattern,
-                    NextRecurrenceDate = viewModel.IsRecurring ? viewModel.Date.AddDays(1) : null
+                    NextRecurrenceDate = viewModel.IsRecurring ? CalculateNextRecurrenceDate(viewModel.Date, viewModel.RecurrencePattern) : null
                 };
 
                 await _transactionService.CreateTransactionAsync(transaction);
                 return RedirectToAction(nameof(Index));
             }
 
-            viewModel.Categories = await _context.Categories.Where(c => c.UserId == GetUserId()).ToListAsync();
+            // If we get here, something failed; redisplay form with both user's and system categories
+            var userId = GetUserId();
+            viewModel.Categories = await _context.Categories
+                .Where(c => c.UserId == userId || c.IsSystem)
+                .OrderBy(c => c.Name)
+                .ToListAsync();
             return View(viewModel);
         }
 
@@ -123,7 +122,10 @@ namespace FinanceManager.Controllers
                 Type = transaction.Type,
                 IsRecurring = transaction.IsRecurring,
                 RecurrencePattern = transaction.RecurrencePattern,
-                Categories = await _context.Categories.Where(c => c.UserId == userId).ToListAsync()
+                Categories = await _context.Categories
+                    .Where(c => c.UserId == userId || c.IsSystem)  // Include both user's and system categories
+                    .OrderBy(c => c.Name)
+                    .ToListAsync()
             };
 
             return View(viewModel);
@@ -157,7 +159,12 @@ namespace FinanceManager.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            viewModel.Categories = await _context.Categories.Where(c => c.UserId == GetUserId()).ToListAsync();
+            // If we get here, something failed; redisplay form with both user's and system categories
+            var userId = GetUserId();
+            viewModel.Categories = await _context.Categories
+                .Where(c => c.UserId == userId || c.IsSystem)
+                .OrderBy(c => c.Name)
+                .ToListAsync();
             return View(viewModel);
         }
 
