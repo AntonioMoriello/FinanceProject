@@ -1,0 +1,122 @@
+@model BudgetListViewModel
+
+@{
+    ViewData["Title"] = "Budgets";
+}
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Budgets</h1>
+        <a asp-action="Create" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Create New Budget
+        </a>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Budget Overview</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="Index" method="get" class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Start Date</label>
+                            <input type="date" name="startDate" class="form-control" value="@Model.StartDate?.ToString("yyyy-MM-dd")" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">End Date</label>
+                            <input type="date" name="endDate" class="form-control" value="@Model.EndDate?.ToString("yyyy-MM-dd")" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Period</label>
+                            <select name="period" class="form-select" asp-items="Html.GetEnumSelectList<BudgetPeriod>()">
+                                <option value="">All Periods</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">Filter</button>
+                            <a asp-action="Index" class="btn btn-secondary">Reset</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        @foreach (var budget in Model.Budgets)
+
+        {
+            <div class="col-md-4 mb-4">
+                <div class="card shadow h-100">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">@budget.Name</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <strong>Category:</strong> @budget.Category.Name
+                        </div>
+                        <div class="mb-3">
+                            <strong>Period:</strong> @budget.Period
+                        </div>
+                        <div class="mb-3">
+                            <strong>Amount:</strong> @budget.Amount.ToString("C")
+                        </div>
+                        <div class="mb-3">
+                            <strong>Progress:</strong>
+                            @{
+                                var percentage = Model.SpendingPercentages[budget.BudgetId];
+
+                                var progressClass = percentage > 100 ? "danger" :
+
+                                percentage > 90 ? "warning" : "success";
+                            }
+                            <div class="progress">
+                                <div class="progress-bar bg-@progressClass"
+                                     role="progressbar"
+                                     style="width: @Math.Min(percentage, 100)%"
+                                     aria-valuenow="@percentage"
+                                     aria-valuemin="0"
+                                     aria-valuemax="100">
+                                    @percentage.ToString("F1")%
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Remaining:</strong> @Model.RemainingAmounts[budget.BudgetId].ToString("C")
+                        </div>
+                        <div class="text-muted small">
+                            <div>Start: @budget.StartDate.ToShortDateString()</div>
+                            <div>End: @budget.EndDate.ToShortDateString()</div>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <div class="btn-group w-100">
+                            <a asp-action="Edit" asp-route-id="@budget.BudgetId"
+                               class="btn btn-outline-primary">
+                                <i class="fas fa-edit"></i> Edit
+                            </a>
+                            <a asp-action="Details" asp-route-id="@budget.BudgetId"
+                               class="btn btn-outline-info">
+                                <i class="fas fa-info-circle"></i> Details
+                            </a>
+                            <a asp-action="Delete" asp-route-id="@budget.BudgetId"
+                               class="btn btn-outline-danger">
+                                <i class="fas fa-trash"></i> Delete
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Initialize any JavaScript components here
+        });
+    </script>
+}

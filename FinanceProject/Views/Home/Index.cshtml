@@ -1,0 +1,220 @@
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="container-fluid mt-4">
+    <!-- Welcome Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-body">
+                    <h1 class="display-4">Welcome to Finance Manager</h1>
+                    <p class="lead">Track your finances, manage budgets, and achieve your financial goals.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4">
+                        <div class="col-md-3">
+                            <a asp-controller="Transactions" asp-action="Create" class="btn btn-outline-primary w-100 h-100 d-flex flex-column align-items-center justify-content-center p-4">
+                                <i class="fas fa-plus-circle fa-3x mb-2"></i>
+                                <span>Add Transaction</span>
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a asp-controller="Budgets" asp-action="Create" class="btn btn-outline-success w-100 h-100 d-flex flex-column align-items-center justify-content-center p-4">
+                                <i class="fas fa-wallet fa-3x mb-2"></i>
+                                <span>Create Budget</span>
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a asp-controller="Goals" asp-action="Create" class="btn btn-outline-info w-100 h-100 d-flex flex-column align-items-center justify-content-center p-4">
+                                <i class="fas fa-bullseye fa-3x mb-2"></i>
+                                <span>Set New Goal</span>
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a asp-controller="Reports" asp-action="Index" class="btn btn-outline-warning w-100 h-100 d-flex flex-column align-items-center justify-content-center p-4">
+                                <i class="fas fa-chart-line fa-3x mb-2"></i>
+                                <span>View Reports</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Financial Overview -->
+    <div class="row mb-4">
+        <!-- Balance Summary -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">Balance Summary</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="balanceChart" width="400" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Transactions -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">Recent Transactions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentTransactions">
+                                <!-- Populated via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Budget & Goals Progress -->
+    <div class="row mb-4">
+        <!-- Budget Overview -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-warning">
+                    <h5 class="card-title mb-0">Budget Overview</h5>
+                </div>
+                <div class="card-body">
+                    <div id="budgetProgress">
+                        <!-- Populated via JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Goals Progress -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Goals Progress</h5>
+                </div>
+                <div class="card-body">
+                    <div id="goalsProgress">
+                        <!-- Populated via JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        $(document).ready(function() {
+            // Initialize Balance Chart
+            const balanceCtx = document.getElementById('balanceChart').getContext('2d');
+            const balanceChart = new Chart(balanceCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [{
+                        label: 'Balance',
+                        data: [0, 0, 0, 0, 0, 0], // Will be populated with real data
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+
+            // Fetch and update dashboard data
+            function updateDashboard() {
+                $.get('/Home/GetDashboardData', function(data) {
+                    // Update Balance Chart
+                    balanceChart.data.labels = data.balanceLabels;
+                    balanceChart.data.datasets[0].data = data.balanceData;
+                    balanceChart.update();
+
+                    // Update Recent Transactions
+                    $('#recentTransactions').html(data.recentTransactions.map(t => `
+                        <tr>
+                            <td>${new Date(t.date).toLocaleDateString()}</td>
+                            <td>${t.description}</td>
+                            <td class="${t.amount >= 0 ? 'text-success' : 'text-danger'}">
+                                ${t.amount.toFixed(2)}
+                            </td>
+                        </tr>
+                    `).join(''));
+
+                    // Update Budget Progress
+                    $('#budgetProgress').html(data.budgets.map(b => `
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>${b.name}</span>
+                                <span>${b.spent}/${b.limit}</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar ${b.percentage > 90 ? 'bg-danger' : 'bg-success'}"
+                                     role="progressbar"
+                                     style="width: ${Math.min(b.percentage, 100)}%"
+                                     aria-valuenow="${b.percentage}"
+                                     aria-valuemin="0"
+                                     aria-valuemax="100">
+                                    ${b.percentage}%
+                                </div>
+                            </div>
+                        </div>
+                    `).join(''));
+
+                    // Update Goals Progress
+                    $('#goalsProgress').html(data.goals.map(g => `
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>${g.name}</span>
+                                <span>${g.current}/${g.target}</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-info"
+                                     role="progressbar"
+                                     style="width: ${g.percentage}%"
+                                     aria-valuenow="${g.percentage}"
+                                     aria-valuemin="0"
+                                     aria-valuemax="100">
+                                    ${g.percentage}%
+                                </div>
+                            </div>
+                        </div>
+                    `).join(''));
+                });
+            }
+
+            // Initial update
+            updateDashboard();
+
+            // Update every 5 minutes
+            setInterval(updateDashboard, 300000);
+        });
+    </script>
+}

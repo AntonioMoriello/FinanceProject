@@ -1,0 +1,126 @@
+@model GoalListViewModel
+
+@{
+    ViewData["Title"] = "Financial Goals";
+}
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Financial Goals</h1>
+        <a asp-action="Create" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Create New Goal
+        </a>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Goal Filters</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="Index" method="get" class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Goal Type</label>
+                            <select name="type" class="form-select" asp-items="Html.GetEnumSelectList<GoalType>()">
+                                <option value="">All Types</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Status</label>
+                            <select name="status" class="form-select" asp-items="Html.GetEnumSelectList<GoalStatus>()">
+                                <option value="">All Statuses</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">Filter</button>
+                            <a asp-action="Index" class="btn btn-secondary">Reset</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        @foreach (var goal in Model.Goals)
+
+        {
+
+            var progressPercentage = Model.ProgressPercentages[goal.GoalId];
+
+            var remainingAmount = Model.RemainingAmounts[goal.GoalId];
+
+            var remainingDays = Model.RemainingDays[goal.GoalId];
+
+            <div class="col-md-4 mb-4">
+                <div class="card shadow h-100">
+                    <div class="card-header @(goal.Status == GoalStatus.Completed ? "bg-success" :
+                                            goal.Status == GoalStatus.Abandoned ? "bg-danger" :
+                                            "bg-primary") text-white">
+                        <h5 class="card-title mb-0">@goal.Name</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <strong>Type:</strong> @goal.Type
+                        </div>
+                        <div class="mb-3">
+                            <strong>Target Amount:</strong> @goal.TargetAmount.ToString("C")
+                        </div>
+                        <div class="mb-3">
+                            <strong>Progress:</strong>
+                            <div class="progress">
+                                <div class="progress-bar @(progressPercentage >= 100 ? "bg-success" :
+                                                         progressPercentage >= 75 ? "bg-info" :
+                                                         progressPercentage >= 50 ? "bg-primary" :
+                                                         "bg-warning")"
+                                     role="progressbar"
+                                     style="width: @Math.Min(progressPercentage, 100)%"
+                                     aria-valuenow="@progressPercentage"
+                                     aria-valuemin="0"
+                                     aria-valuemax="100">
+                                    @progressPercentage.ToString("F1")%
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Remaining:</strong> @remainingAmount.ToString("C")
+                        </div>
+                        <div class="mb-3">
+                            <strong>Time Left:</strong> @(remainingDays > 0 ? $"{remainingDays} days" : "Deadline passed")
+                        </div>
+                        <div class="text-muted small">
+                            <div>Start: @goal.StartDate.ToShortDateString()</div>
+                            <div>Target Date: @goal.TargetDate.ToShortDateString()</div>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <div class="btn-group w-100">
+                            <a asp-action="Edit" asp-route-id="@goal.GoalId"
+                               class="btn btn-outline-primary">
+                                <i class="fas fa-edit"></i> Edit
+                            </a>
+                            <a asp-action="Details" asp-route-id="@goal.GoalId"
+                               class="btn btn-outline-info">
+                                <i class="fas fa-info-circle"></i> Details
+                            </a>
+                            <a asp-action="Delete" asp-route-id="@goal.GoalId"
+                               class="btn btn-outline-danger">
+                                <i class="fas fa-trash"></i> Delete
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Initialize tooltips
+            $('[data-bs-toggle="tooltip"]').tooltip();
+        });
+    </script>
+}

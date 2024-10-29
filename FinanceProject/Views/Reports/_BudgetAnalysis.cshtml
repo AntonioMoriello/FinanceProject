@@ -1,0 +1,155 @@
+@model BudgetReportViewModel
+
+<div class="row">
+    <!-- Summary Cards -->
+    <div class="col-md-4 mb-4">
+        <div class="card shadow border-primary">
+            <div class="card-body">
+                <h5 class="card-title text-primary">Total Budgeted</h5>
+                <h2>@Model.TotalBudgeted.ToString("C")</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card shadow border-danger">
+            <div class="card-body">
+                <h5 class="card-title text-danger">Total Spent</h5>
+                <h2>@Model.TotalSpent.ToString("C")</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card shadow border-success">
+            <div class="card-body">
+                <h5 class="card-title text-success">Total Remaining</h5>
+                <h2>@Model.TotalRemaining.ToString("C")</h2>
+            </div>
+        </div>
+    </div>
+
+    <!-- Budget Progress -->
+    <div class="col-md-6 mb-4">
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Budget Progress</h5>
+            </div>
+            <div class="card-body">
+                @foreach (var budget in Model.BudgetSummaries)
+
+                {
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>@budget.Category</span>
+                            <span>@budget.Spent.ToString("C") / @budget.Budgeted.ToString("C")</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar @(budget.UsagePercentage > 100 ? "bg-danger" :
+                                                     budget.UsagePercentage > 90 ? "bg-warning" :
+                                                     "bg-success")"
+                                 role="progressbar"
+                                 style="width: @Math.Min(budget.UsagePercentage, 100)%"
+                                 aria-valuenow="@budget.UsagePercentage"
+                                 aria-valuemin="0"
+                                 aria-valuemax="100">
+                                @budget.UsagePercentage.ToString("F1")%
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Spending Trends -->
+    <div class="col-md-6 mb-4">
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Monthly Spending Trends</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="monthlySpendingChart"
+                        data-chart="bar"
+                        data-chart-data="@Json.Serialize(new
+                    {
+                        labels = Model.MonthlySpending.First().Value.Select((v, i) => $"Month {i + 1}"),
+
+                        datasets = Model.MonthlySpending.Select(ms => new
+                        {
+                            label = ms.Key,
+
+                            data = ms.Value,
+
+                            backgroundColor = GetRandomColor(Model.MonthlySpending.Keys.ToList().IndexOf(ms.Key))
+
+                        })
+
+                    })"
+                        height="300"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Budget Table -->
+    <div class="col-12 mb-4">
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Detailed Budget Analysis</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th class="text-end">Budgeted</th>
+                                <th class="text-end">Spent</th>
+                                <th class="text-end">Remaining</th>
+                                <th class="text-end">Usage %</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var budget in Model.BudgetSummaries)
+
+                            {
+                                <tr>
+                                    <td>@budget.Category</td>
+                                    <td class="text-end">@budget.Budgeted.ToString("C")</td>
+                                    <td class="text-end">@budget.Spent.ToString("C")</td>
+                                    <td class="text-end @(budget.Remaining >= 0 ? "text-success" : "text-danger")">
+                                        @budget.Remaining.ToString("C")
+                                    </td>
+                                    <td class="text-end">@budget.UsagePercentage.ToString("F1")%</td>
+                                    <td>
+                                        <span class="badge @(budget.UsagePercentage > 100 ? "bg-danger" :
+                                                            budget.UsagePercentage > 90 ? "bg-warning" :
+                                                            "bg-success")">
+                                            @(budget.UsagePercentage > 100 ? "Over Budget" :
+                                                budget.UsagePercentage > 90 ? "Near Limit" :
+                                                "On Track")
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@functions {
+    private string GetRandomColor(int index)
+
+    {
+
+        var colors = new[] {
+            "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF",
+            "#FF9F40", "#4BC0C0", "#FF6384", "#36A2EB", "#FFCE56"
+        };
+
+        return colors[index % colors.Length];
+
+    }
+}

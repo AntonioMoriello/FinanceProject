@@ -1,0 +1,104 @@
+@{
+    ViewData["Title"] = "Welcome to Finance Manager";
+}
+
+<div class="container-fluid">
+    <!-- Hero Section -->
+    <div class="row bg-primary text-white py-5">
+        <div class="col-md-8 mx-auto text-center">
+            <h1 class="display-4 mb-4">Take Control of Your Finances</h1>
+            <p class="lead mb-4">Track expenses, manage budgets, and achieve your financial goals with Finance Manager</p>
+            <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+                <a asp-controller="Account" asp-action="Register" class="btn btn-light btn-lg px-4 gap-3">Get Started</a>
+                <a asp-controller="Account" asp-action="Login" class="btn btn-outline-light btn-lg px-4">Sign In</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features Section -->
+    <div class="row py-5">
+        <div class="col-md-8 mx-auto">
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body text-center">
+                            <i class="fas fa-chart-line fa-3x text-primary mb-3"></i>
+                            <h3 class="card-title h5">Track Expenses</h3>
+                            <p class="card-text">Monitor your spending habits with detailed transaction tracking and categorization.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body text-center">
+                            <i class="fas fa-piggy-bank fa-3x text-success mb-3"></i>
+                            <h3 class="card-title h5">Budget Management</h3>
+                            <p class="card-text">Create and manage budgets to keep your spending under control.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body text-center">
+                            <i class="fas fa-bullseye fa-3x text-info mb-3"></i>
+                            <h3 class="card-title h5">Financial Goals</h3>
+                            <p class="card-text">Set and track financial goals to achieve your dreams.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- How It Works Section -->
+    <div class="row bg-light py-5">
+        <div class="col-md-8 mx-auto">
+            <h2 class="text-center mb-4">How It Works</h2>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="circle bg-primary text-white mb-3">1</div>
+                        <h4>Create Account</h4>
+                        <p>Sign up for free and set up your profile</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="circle bg-primary text-white mb-3">2</div>
+                        <h4>Add Transactions</h4>
+                        <p>Start tracking your income and expenses</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="circle bg-primary text-white mb-3">3</div>
+                        <h4>Track Progress</h4>
+                        <p>Monitor your financial health with detailed reports</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Call to Action -->
+    <div class="row py-5">
+        <div class="col-md-8 mx-auto text-center">
+            <h2 class="mb-4">Ready to Start?</h2>
+            <p class="lead mb-4">Join thousands of users who are already managing their finances better</p>
+            <a asp-controller="Account" asp-action="Register" class="btn btn-primary btn-lg">Create Free Account</a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .circle {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        margin: 0 auto;
+    }
+</style>

@@ -1,0 +1,82 @@
+@model Transaction
+
+@{
+    ViewData["Title"] = "Transaction Details";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h4 class="card-title mb-0">Transaction Details</h4>
+                    <div>
+                        <a asp-action="Edit" asp-route-id="@Model.TransactionId"
+                           class="btn btn-light btn-sm">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h5>Basic Information</h5>
+                            <dl class="row">
+                                <dt class="col-sm-4">Date</dt>
+                                <dd class="col-sm-8">@Model.Date.ToShortDateString()</dd>
+
+                                <dt class="col-sm-4">Type</dt>
+                                <dd class="col-sm-8">
+                                    <span class="badge bg-@(Model.Type == TransactionType.Income ? "success" : "danger")">
+                                        @Model.Type
+                                    </span>
+                                </dd>
+
+                                <dt class="col-sm-4">Amount</dt>
+                                <dd class="col-sm-8 @(Model.Type == TransactionType.Income ? "text-success" : "text-danger")">
+                                    @Model.Amount.ToString("C")
+                                </dd>
+
+                                <dt class="col-sm-4">Category</dt>
+                                <dd class="col-sm-8">
+                                    <span class="badge" style="background-color: @Model.Category.ColorCode">
+                                        @Model.Category.Name
+                                    </span>
+                                </dd>
+                            </dl>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Additional Details</h5>
+                            <dl class="row">
+                                <dt class="col-sm-4">Description</dt>
+                                <dd class="col-sm-8">@Model.Description</dd>
+
+                                <dt class="col-sm-4">Recurring</dt>
+                                <dd class="col-sm-8">
+                                    @if (Model.IsRecurring)
+
+                                    {
+                                        <span class="badge bg-info">Yes - @Model.RecurrencePattern</span>
+                                        <div class="small text-muted mt-1">
+                                            Next Date: @Model.NextRecurrenceDate?.ToShortDateString()
+                                        </div>
+                                    }
+
+                                    else
+
+                                    {
+                                        <span>No</span>
+                                    }
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <a asp-action="Index" class="btn btn-secondary">Back to List</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

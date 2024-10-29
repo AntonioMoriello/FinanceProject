@@ -1,0 +1,118 @@
+@model TransactionEditViewModel
+
+@{
+    ViewData["Title"] = "Edit Transaction";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="card-title mb-0">Edit Transaction</h4>
+                </div>
+                <div class="card-body">
+                    <form asp-action="Edit" method="post">
+                        <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+                        <input type="hidden" asp-for="TransactionId" />
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="Date" class="form-label"></label>
+                                <input asp-for="Date" class="form-control" type="date" />
+                                <span asp-validation-for="Date" class="text-danger"></span>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="Type" class="form-label"></label>
+                                <select asp-for="Type" class="form-select"
+                                        asp-items="Html.GetEnumSelectList<TransactionType>()">
+                                </select>
+                                <span asp-validation-for="Type" class="text-danger"></span>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="Amount" class="form-label"></label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input asp-for="Amount" class="form-control" type="number" step="0.01" />
+                                </div>
+                                <span asp-validation-for="Amount" class="text-danger"></span>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="CategoryId" class="form-label"></label>
+                                <select asp-for="CategoryId" class="form-select"
+                                        asp-items="@(new SelectList(Model.Categories, "CategoryId", "Name"))">
+                                    <option value="">Select a Category</option>
+                                </select>
+                                <span asp-validation-for="CategoryId" class="text-danger"></span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Description" class="form-label"></label>
+                            <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+                            <span asp-validation-for="Description" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input asp-for="IsRecurring" class="form-check-input" />
+                                <label asp-for="IsRecurring" class="form-check-label"></label>
+                            </div>
+                        </div>
+
+                        <div id="recurringOptions" style="display: @(Model.IsRecurring ? "block" : "none")">
+                            <div class="mb-3">
+                                <label asp-for="RecurrencePattern" class="form-label"></label>
+                                <select asp-for="RecurrencePattern" class="form-select">
+                                    <option value="daily">Daily</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="monthly">Monthly</option>
+                                    <option value="yearly">Yearly</option>
+                                </select>
+                                <span asp-validation-for="RecurrencePattern" class="text-danger"></span>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                            <a asp-action="Index" class="btn btn-secondary">Back to List</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        $(document).ready(function () {
+            // Toggle recurring options
+            $('#IsRecurring').change(function () {
+                $('#recurringOptions').slideToggle(this.checked);
+            });
+
+            // Dynamic category loading based on transaction type
+            $('#Type').change(function () {
+                var type = $(this).val();
+                var categorySelect = $('#CategoryId');
+
+                $.get('/Transactions/GetCategoriesByType', { type: type }, function (categories) {
+                    categorySelect.empty();
+                    categorySelect.append($('<option></option>').val('').text('Select a Category'));
+                    $.each(categories, function (i, category) {
+                        categorySelect.append($('<option></option>')
+                            .val(category.categoryId)
+                            .text(category.name));
+                    });
+                });
+            });
+        });
+    </script>
+}

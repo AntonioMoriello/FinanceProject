@@ -1,0 +1,95 @@
+@model CashFlowReportViewModel
+
+<div class="row">
+    <!-- Trend Chart -->
+    <div class="col-12 mb-4">
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Cash Flow Trends</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="cashFlowChart"
+                        data-chart="line"
+                        data-chart-data="@Json.Serialize(new {
+                            labels = Model.Trends.Select(t => t.Month),
+                            datasets = new[] {
+                                new {
+                                    label = "Income",
+                                    data = Model.MonthlyIncome.Values,
+                                    borderColor = "#4BC0C0",
+                                    fill = false
+                                },
+                                new {
+                                    label = "Expenses",
+                                    data = Model.MonthlyExpenses.Values,
+                                    borderColor = "#FF6384",
+                                    fill = false
+                                },
+                                new {
+                                    label = "Savings",
+                                    data = Model.MonthlySavings.Values,
+                                    borderColor = "#36A2EB",
+                                    fill = false
+                                }
+                            }
+                        })"
+                        height="300"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Details -->
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Monthly Details</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th class="text-end">Income</th>
+                                <th class="text-end">Expenses</th>
+                                <th class="text-end">Savings</th>
+                                <th class="text-end">Savings Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var trend in Model.Trends)
+                            {
+                                <tr>
+                                    <td>@trend.Month</td>
+                                    <td class="text-end text-success">@trend.Income.ToString("C")</td>
+                                    <td class="text-end text-danger">@trend.Expenses.ToString("C")</td>
+                                    <td class="text-end @(trend.Savings >= 0 ? "text-success" : "text-danger")">
+                                        @trend.Savings.ToString("C")
+                                    </td>
+                                    <td class="text-end">@trend.SavingsRate.ToString("F1")%</td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-active">
+                                <th>Average</th>
+                                <td class="text-end text-success">
+                                    @Model.Trends.Average(t => t.Income).ToString("C")
+                                </td>
+                                <td class="text-end text-danger">
+                                    @Model.Trends.Average(t => t.Expenses).ToString("C")
+                                </td>
+                                <td class="text-end">
+                                    @Model.Trends.Average(t => t.Savings).ToString("C")
+                                </td>
+                                <td class="text-end">
+                                    @Model.Trends.Average(t => t.SavingsRate).ToString("F1")%
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
