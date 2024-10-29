@@ -7,8 +7,18 @@ using OfficeOpenXml;
 using DinkToPdf;
 using DinkToPdf.Contracts;
 using FinanceManager.Models;
+using System.Runtime.InteropServices;
+using FinanceManager;
+using FinanceManager.FinanceManager;
+
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Initialize DinkToPdf with custom loader
+var assemblyLoadContext = new CustomAssemblyLoadContext();
+var architectureFolder = RuntimeInformation.ProcessArchitecture == Architecture.X64 ? "x64" : "x86";
+var libraryPath = Path.Combine(Directory.GetCurrentDirectory(), "Native", "libwkhtmltox.dll");
+assemblyLoadContext.LoadUnmanagedLibrary(libraryPath);
 
 // Set EPPlus license context
 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
@@ -82,16 +92,16 @@ using (var scope = app.Services.CreateScope())
     var services = scope.ServiceProvider;
     try
     {
-        var context = services.GetRequiredService<ApplicationDbContext>();
+        var dbContext = services.GetRequiredService<ApplicationDbContext>();
 
         // Drop the database if it exists
-        await context.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureDeletedAsync();
 
         // Create the database and apply migrations
-        await context.Database.EnsureCreatedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
 
         // Add default categories
-        if (!context.Categories.Any())
+        if (!dbContext.Categories.Any())
         {
             var defaultCategories = new List<Category>
             {
@@ -101,8 +111,8 @@ using (var scope = app.Services.CreateScope())
                 new Category { Name = "Income", Description = "Salary and Other Income", Type = CategoryType.Income, ColorCode = "#57FF33", IsSystem = true }
             };
 
-            await context.Categories.AddRangeAsync(defaultCategories);
-            await context.SaveChangesAsync();
+            await dbContext.Categories.AddRangeAsync(defaultCategories);
+            await dbContext.SaveChangesAsync();
         }
 
         var logger = services.GetRequiredService<ILogger<Program>>();
