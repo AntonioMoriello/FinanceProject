@@ -34,15 +34,34 @@ namespace FinanceManager.Controllers
                     Username = model.Username,
                     Email = model.Email,
                     FirstName = model.FirstName,
-                    LastName = model.LastName
+                    LastName = model.LastName,
+                    CreatedDate = DateTime.UtcNow,
+                    IsActive = true
                 };
 
-                var (success, message) = await _accountService.RegisterUserAsync(user, model.Password);
+                var (success, message, userId) = await _accountService.RegisterUserAsync(user, model.Password);
 
                 if (success)
                 {
-                    TempData["SuccessMessage"] = "Registration successful! Please log in.";
-                    return RedirectToAction(nameof(Login));
+                    // Create claims for the user
+                    var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+            };
+
+                    var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                    var authProperties = new AuthenticationProperties();
+
+                    // Sign in the user immediately after registration
+                    await HttpContext.SignInAsync(
+                        CookieAuthenticationDefaults.AuthenticationScheme,
+                        new ClaimsPrincipal(claimsIdentity),
+                        authProperties);
+
+                    TempData["SuccessMessage"] = "Registration successful!";
+                    return RedirectToAction("Index", "Home");
                 }
 
                 ModelState.AddModelError("", message);

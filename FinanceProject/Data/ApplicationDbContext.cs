@@ -22,39 +22,43 @@ namespace FinanceManager.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // User configurations
+            // User configuration
             modelBuilder.Entity<User>(entity =>
             {
+                entity.ToTable("Users");
                 entity.HasKey(e => e.UserId);
-                entity.Property(e => e.Username).IsRequired().HasMaxLength(50);
-                entity.Property(e => e.Email).IsRequired().HasMaxLength(100);
-                entity.Property(e => e.PasswordHash).IsRequired().HasMaxLength(100);
-                entity.Property(e => e.SecurityStamp).HasMaxLength(100);
-                entity.Property(e => e.CreatedDate).HasDefaultValueSql("CURRENT_TIMESTAMP");
-                entity.Property(e => e.IsActive).HasDefaultValue(true);
 
-                entity.HasIndex(e => e.Email).IsUnique();
-                entity.HasIndex(e => e.Username).IsUnique();
+                entity.Property(e => e.UserId)
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(e => e.Username)
+                    .IsRequired()
+                    .HasMaxLength(50);
+
+                entity.Property(e => e.Email)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.PasswordHash)
+                    .IsRequired();
+
+                entity.HasIndex(e => e.Email)
+                    .IsUnique();
+
+                entity.HasIndex(e => e.Username)
+                    .IsUnique();
             });
 
             // Transaction configurations
             modelBuilder.Entity<Transaction>(entity =>
             {
-                entity.HasKey(e => e.TransactionId);
-                entity.Property(e => e.Amount).HasColumnType("decimal(18,2)");
-                entity.Property(e => e.Description).HasMaxLength(200);
-                entity.Property(e => e.Date).IsRequired();
-
                 entity.HasOne(d => d.User)
                     .WithMany(p => p.Transactions)
                     .HasForeignKey(d => d.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                entity.HasOne(d => d.Category)
-                    .WithMany(p => p.Transactions)
-                    .HasForeignKey(d => d.CategoryId)
-                    .OnDelete(DeleteBehavior.Restrict);
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
             });
+
 
             // Category configurations
             modelBuilder.Entity<Category>(entity =>

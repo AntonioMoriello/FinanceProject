@@ -94,13 +94,10 @@ using (var scope = app.Services.CreateScope())
     {
         var dbContext = services.GetRequiredService<ApplicationDbContext>();
 
-        // Drop the database if it exists
-        await dbContext.Database.EnsureDeletedAsync();
-
-        // Create the database and apply migrations
+        // Only create database if it doesn't exist
         await dbContext.Database.EnsureCreatedAsync();
 
-        // Add default categories
+        // Add default categories if they don't exist
         if (!dbContext.Categories.Any())
         {
             var defaultCategories = new List<Category>

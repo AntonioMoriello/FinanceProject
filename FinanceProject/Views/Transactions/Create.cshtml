@@ -12,19 +12,20 @@
                     <h4 class="card-title mb-0">Add New Transaction</h4>
                 </div>
                 <div class="card-body">
-                    <form asp-action="Create" method="post">
+                    <form asp-action="Create" method="post" id="transactionForm">
                         <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label asp-for="Date" class="form-label"></label>
-                                <input asp-for="Date" class="form-control" type="date" />
+                                <input asp-for="Date" class="form-control" type="date" required />
                                 <span asp-validation-for="Date" class="text-danger"></span>
                             </div>
 
                             <div class="col-md-6 mb-3">
                                 <label asp-for="Type" class="form-label"></label>
-                                <select asp-for="Type" class="form-select" asp-items="Html.GetEnumSelectList<TransactionType>()">
+                                <select asp-for="Type" class="form-select" asp-items="Html.GetEnumSelectList<TransactionType>()" required>
+                                    <option value="">Select Type</option>
                                 </select>
                                 <span asp-validation-for="Type" class="text-danger"></span>
                             </div>
@@ -35,7 +36,7 @@
                                 <label asp-for="Amount" class="form-label"></label>
                                 <div class="input-group">
                                     <span class="input-group-text">$</span>
-                                    <input asp-for="Amount" class="form-control" type="number" step="0.01" />
+                                    <input asp-for="Amount" class="form-control" type="number" step="0.01" min="0.01" required />
                                 </div>
                                 <span asp-validation-for="Amount" class="text-danger"></span>
                             </div>
@@ -43,7 +44,7 @@
                             <div class="col-md-6 mb-3">
                                 <label asp-for="CategoryId" class="form-label"></label>
                                 <select asp-for="CategoryId" class="form-select"
-                                        asp-items="@(new SelectList(Model.Categories, "CategoryId", "Name"))">
+                                        asp-items="@(new SelectList(Model.Categories, "CategoryId", "Name"))" required>
                                     <option value="">Select a Category</option>
                                 </select>
                                 <span asp-validation-for="CategoryId" class="text-danger"></span>
@@ -58,27 +59,37 @@
 
                         <div class="mb-3">
                             <div class="form-check">
-                                <input asp-for="IsRecurring" class="form-check-input" />
-                                <label asp-for="IsRecurring" class="form-check-label"></label>
+                                <input asp-for="IsRecurring" class="form-check-input" id="isRecurringCheck" />
+                                <label asp-for="IsRecurring" class="form-check-label">Make this a recurring transaction</label>
                             </div>
                         </div>
 
-                        <div id="recurringOptions" style="display: none;">
-                            <div class="mb-3">
-                                <label asp-for="RecurrencePattern" class="form-label"></label>
-                                <select asp-for="RecurrencePattern" class="form-select">
-                                    <option value="daily">Daily</option>
-                                    <option value="weekly">Weekly</option>
-                                    <option value="monthly">Monthly</option>
-                                    <option value="yearly">Yearly</option>
-                                </select>
-                                <span asp-validation-for="RecurrencePattern" class="text-danger"></span>
+                        <div id="recurringOptions" class="mb-3" style="display: none;">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label asp-for="RecurrencePattern" class="form-label">How often should this transaction repeat?</label>
+                                        <select asp-for="RecurrencePattern" class="form-select" id="recurrencePatternSelect">
+                                            <option value="">Select Frequency</option>
+                                            <option value="daily">Daily</option>
+                                            <option value="weekly">Weekly</option>
+                                            <option value="monthly">Monthly</option>
+                                            <option value="yearly">Yearly</option>
+                                        </select>
+                                        <span asp-validation-for="RecurrencePattern" class="text-danger"></span>
+                                        <div class="form-text mt-2" id="patternDescription"></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
                         <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary">Add Transaction</button>
-                            <a asp-action="Index" class="btn btn-secondary">Back to List</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-plus-circle me-2"></i>Add Transaction
+                            </button>
+                            <a asp-action="Index" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Back to List
+                            </a>
                         </div>
                     </form>
                 </div>
@@ -91,20 +102,46 @@
     <partial name="_ValidationScriptsPartial" />
     <script>
         $(document).ready(function () {
-            // Toggle recurring options
-            $('#IsRecurring').change(function () {
-                $('#recurringOptions').slideToggle(this.checked);
-            });
-
-            // Set default date to today
+            // Set default date to today if not set
             if (!$('#Date').val()) {
                 $('#Date').val(new Date().toISOString().split('T')[0]);
             }
+
+            // Toggle recurring options
+            $('#isRecurringCheck').change(function () {
+                const $recurringOptions = $('#recurringOptions');
+                const $patternSelect = $('#recurrencePatternSelect');
+
+                if (this.checked) {
+                    $recurringOptions.slideDown();
+                    $patternSelect.prop('required', true);
+                } else {
+                    $recurringOptions.slideUp();
+                    $patternSelect.prop('required', false).val('');
+                    $('#patternDescription').text('');
+                }
+            });
+
+            // Update pattern description
+            $('#recurrencePatternSelect').change(function () {
+                const descriptions = {
+                    'daily': 'This transaction will repeat every day',
+                    'weekly': 'This transaction will repeat every week on the same day',
+                    'monthly': 'This transaction will repeat every month on the same date',
+                    'yearly': 'This transaction will repeat every year on the same date'
+                };
+                $('#patternDescription').text(descriptions[$(this).val()] || '');
+            });
 
             // Dynamic category loading based on transaction type
             $('#Type').change(function () {
                 var type = $(this).val();
                 var categorySelect = $('#CategoryId');
+
+                if (!type) {
+                    categorySelect.empty().append($('<option></option>').val('').text('Select a Category'));
+                    return;
+                }
 
                 $.get('/Transactions/GetCategoriesByType', { type: type }, function (categories) {
                     categorySelect.empty();
@@ -116,6 +153,22 @@
                     });
                 });
             });
+
+            // Form validation
+            $('#transactionForm').submit(function (e) {
+                const isRecurring = $('#isRecurringCheck').is(':checked');
+                const pattern = $('#recurrencePatternSelect').val();
+
+                if (isRecurring && !pattern) {
+                    e.preventDefault();
+                    alert('Please select a recurrence pattern for recurring transactions.');
+                    return false;
+                }
+                return true;
+            });
+
+            // Initialize tooltips
+            $('[data-bs-toggle="tooltip"]').tooltip();
         });
     </script>
 }

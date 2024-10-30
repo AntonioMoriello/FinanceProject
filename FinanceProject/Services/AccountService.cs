@@ -7,7 +7,7 @@ namespace FinanceManager.Services
 {
     public interface IAccountService
     {
-        Task<(bool success, string message)> RegisterUserAsync(User user, string password);
+        Task<(bool success, string message, int userId)> RegisterUserAsync(User user, string password);
         Task<(bool success, User user)> ValidateUserAsync(string email, string password);
         Task<bool> CheckEmailExistsAsync(string email);
         Task<User> GetUserByEmailAsync(string email);
@@ -25,20 +25,45 @@ namespace FinanceManager.Services
             _context = context;
         }
 
-        public async Task<(bool success, string message)> RegisterUserAsync(User user, string password)
+        public async Task<(bool success, string message, int userId)> RegisterUserAsync(User user, string password)
         {
-            if (await _context.Users.AnyAsync(u => u.Email == user.Email))
+            try
             {
-                return (false, "Email already exists");
+                if (await _context.Users.AnyAsync(u => u.Email == user.Email))
+                {
+                    return (false, "Email already exists", 0);
+                }
+
+                if (await _context.Users.AnyAsync(u => u.Username == user.Username))
+                {
+                    return (false, "Username already exists", 0);
+                }
+
+                // Hash the password
+                user.PasswordHash = HashPassword(password);
+                user.SecurityStamp = Guid.NewGuid().ToString();
+
+                // Explicitly add the user to the context
+                _context.Users.Add(user);
+                await _context.SaveChangesAsync();
+
+                // Verify the user was saved and get their ID
+                var savedUser = await _context.Users
+                    .FirstOrDefaultAsync(u => u.Email == user.Email);
+
+                if (savedUser == null)
+                {
+                    throw new Exception("Failed to save user to database");
+                }
+
+                return (true, "Registration successful", savedUser.UserId);
             }
-
-            user.PasswordHash = HashPassword(password);
-            user.SecurityStamp = Guid.NewGuid().ToString();
-
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-
-            return (true, "Registration successful");
+            catch (Exception ex)
+            {
+                // Log the error
+                
+                return (false, "Registration failed. Please try again.", 0);
+            }
         }
 
         public async Task<(bool success, User user)> ValidateUserAsync(string email, string password)

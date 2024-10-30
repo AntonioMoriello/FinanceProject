@@ -69,46 +69,59 @@ public class BudgetsController : Controller
             return View(viewModel);
         }
 
-        // GET: Budgets/Create
-        public async Task<IActionResult> Create()
+    // GET: Budgets/Create
+    public async Task<IActionResult> Create()
+    {
+        var userId = GetUserId();
+        var viewModel = new BudgetCreateViewModel
         {
-            var userId = GetUserId();
-            var viewModel = new BudgetCreateViewModel
+            StartDate = DateTime.Today,
+            EndDate = DateTime.Today.AddMonths(1),
+            Categories = await _context.Categories
+                .Where(c => c.UserId == userId || c.IsSystem)  // Include both user's and system categories
+                .Where(c => c.Type == CategoryType.Expense)    // Only show expense categories for budgets
+                .OrderBy(c => c.Name)
+                .ToListAsync()
+        };
+
+        return View(viewModel);
+    }
+
+    // POST: Budgets/Create
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create(BudgetCreateViewModel viewModel)
+    {
+        if (ModelState.IsValid)
+        {
+            var budget = new Budget
             {
-                Categories = await _context.Categories.Where(c => c.UserId == userId).ToListAsync()
+                UserId = GetUserId(),
+                Name = viewModel.Name,
+                CategoryId = viewModel.CategoryId,
+                Amount = viewModel.Amount,
+                StartDate = viewModel.StartDate,
+                EndDate = viewModel.EndDate,
+                Period = viewModel.Period
             };
 
-            return View(viewModel);
+            await _budgetService.CreateBudgetAsync(budget);
+            TempData["SuccessMessage"] = "Budget created successfully!";
+            return RedirectToAction(nameof(Index));
         }
 
-        // POST: Budgets/Create
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(BudgetCreateViewModel viewModel)
-        {
-            if (ModelState.IsValid)
-            {
-                var budget = new Budget
-                {
-                    UserId = GetUserId(),
-                    Name = viewModel.Name,
-                    CategoryId = viewModel.CategoryId,
-                    Amount = viewModel.Amount,
-                    StartDate = viewModel.StartDate,
-                    EndDate = viewModel.EndDate,
-                    Period = viewModel.Period
-                };
+        // If we get here, something failed; redisplay form
+        var userId = GetUserId();
+        viewModel.Categories = await _context.Categories
+            .Where(c => c.UserId == userId || c.IsSystem)  // Include both user's and system categories
+            .Where(c => c.Type == CategoryType.Expense)    // Only show expense categories for budgets
+            .OrderBy(c => c.Name)
+            .ToListAsync();
+        return View(viewModel);
+    }
 
-                await _budgetService.CreateBudgetAsync(budget);
-                return RedirectToAction(nameof(Index));
-            }
-
-            viewModel.Categories = await _context.Categories.Where(c => c.UserId == GetUserId()).ToListAsync();
-            return View(viewModel);
-        }
-
-        // GET: Budgets/Edit/5
-        public async Task<IActionResult> Edit(int id)
+    // GET: Budgets/Edit/5
+    public async Task<IActionResult> Edit(int id)
         {
             var userId = GetUserId();
             var budget = await _budgetService.GetBudgetByIdAsync(id, userId);

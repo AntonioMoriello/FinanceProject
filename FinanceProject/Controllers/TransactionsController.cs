@@ -14,11 +14,16 @@ namespace FinanceManager.Controllers
     {
         private readonly ITransactionService _transactionService;
         private readonly ApplicationDbContext _context;
+        private readonly ILogger<TransactionsController> _logger;
 
-        public TransactionsController(ITransactionService transactionService, ApplicationDbContext context)
+        public TransactionsController(
+            ITransactionService transactionService,
+            ApplicationDbContext context,
+            ILogger<TransactionsController> logger)
         {
             _transactionService = transactionService;
             _context = context;
+            _logger = logger;
         }
 
         private int GetUserId()
@@ -77,31 +82,75 @@ namespace FinanceManager.Controllers
         {
             if (ModelState.IsValid)
             {
-                var transaction = new Transaction
+                try
                 {
-                    UserId = GetUserId(),
-                    CategoryId = viewModel.CategoryId,
-                    Amount = viewModel.Amount,
-                    Description = viewModel.Description,
-                    Date = viewModel.Date,
-                    Type = viewModel.Type,
-                    IsRecurring = viewModel.IsRecurring,
-                    RecurrencePattern = viewModel.RecurrencePattern,
-                    NextRecurrenceDate = viewModel.IsRecurring ? CalculateNextRecurrenceDate(viewModel.Date, viewModel.RecurrencePattern) : null
-                };
+                    var userId = GetUserId();
 
-                await _transactionService.CreateTransactionAsync(transaction);
-                return RedirectToAction(nameof(Index));
+                    // First verify the category exists and belongs to the user or is a system category
+                    var category = await _context.Categories
+                        .FirstOrDefaultAsync(c => c.CategoryId == viewModel.CategoryId &&
+                            (c.UserId == userId || c.IsSystem));
+
+                    if (category == null)
+                    {
+                        ModelState.AddModelError("CategoryId", "Invalid category selected.");
+                        viewModel.Categories = await LoadCategoriesAsync(userId);
+                        return View(viewModel);
+                    }
+
+                    var transaction = new Transaction
+                    {
+                        UserId = userId,
+                        CategoryId = viewModel.CategoryId,
+                        Amount = viewModel.Amount,
+                        Description = viewModel.Description ?? string.Empty,
+                        Date = viewModel.Date,
+                        Type = viewModel.Type,
+                        IsRecurring = viewModel.IsRecurring
+                    };
+
+                    // Only set recurring properties if IsRecurring is true
+                    if (transaction.IsRecurring)
+                    {
+                        if (string.IsNullOrEmpty(viewModel.RecurrencePattern))
+                        {
+                            ModelState.AddModelError("RecurrencePattern", "A recurrence pattern is required for recurring transactions.");
+                            viewModel.Categories = await LoadCategoriesAsync(userId);
+                            return View(viewModel);
+                        }
+
+                        transaction.RecurrencePattern = viewModel.RecurrencePattern;
+                        transaction.NextRecurrenceDate = CalculateNextRecurrenceDate(transaction.Date, transaction.RecurrencePattern);
+                    }
+
+                    _logger.LogInformation("Creating transaction: Category={CategoryId}, User={UserId}, IsRecurring={IsRecurring}",
+                        transaction.CategoryId, transaction.UserId, transaction.IsRecurring);
+
+                    await _transactionService.CreateTransactionAsync(transaction);
+                    TempData["SuccessMessage"] = "Transaction created successfully!";
+                    return RedirectToAction(nameof(Index));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error creating transaction");
+                    ModelState.AddModelError("", $"Unable to save the transaction: {ex.Message}");
+                }
             }
 
-            // If we get here, something failed; redisplay form with both user's and system categories
-            var userId = GetUserId();
-            viewModel.Categories = await _context.Categories
+            // If we get here, something failed; redisplay form
+            viewModel.Categories = await LoadCategoriesAsync(GetUserId());
+            return View(viewModel);
+        }
+
+        private async Task<IEnumerable<Category>> LoadCategoriesAsync(int userId)
+        {
+            return await _context.Categories
                 .Where(c => c.UserId == userId || c.IsSystem)
                 .OrderBy(c => c.Name)
                 .ToListAsync();
-            return View(viewModel);
         }
+
+
 
         // GET: Transactions/Edit/5
         public async Task<IActionResult> Edit(int id)
