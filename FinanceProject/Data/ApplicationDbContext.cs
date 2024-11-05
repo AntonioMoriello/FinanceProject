@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using FinanceManager.Models;
-using System.Reflection.Emit;
 
 namespace FinanceManager.Data
 {
@@ -22,47 +21,57 @@ namespace FinanceManager.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            // Configure decimal properties to use TEXT in SQLite
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                var properties = entityType.ClrType.GetProperties()
+                    .Where(p => p.PropertyType == typeof(decimal) || p.PropertyType == typeof(decimal?));
+
+                foreach (var property in properties)
+                {
+                    modelBuilder.Entity(entityType.Name)
+                        .Property(property.Name)
+                        .HasConversion<double>();
+                }
+            }
+
             // User configuration
             modelBuilder.Entity<User>(entity =>
             {
                 entity.ToTable("Users");
                 entity.HasKey(e => e.UserId);
-
-                entity.Property(e => e.UserId)
-                    .ValueGeneratedOnAdd();
-
-                entity.Property(e => e.Username)
-                    .IsRequired()
-                    .HasMaxLength(50);
-
-                entity.Property(e => e.Email)
-                    .IsRequired()
-                    .HasMaxLength(100);
-
-                entity.Property(e => e.PasswordHash)
-                    .IsRequired();
-
-                entity.HasIndex(e => e.Email)
-                    .IsUnique();
-
-                entity.HasIndex(e => e.Username)
-                    .IsUnique();
+                entity.Property(e => e.UserId).ValueGeneratedOnAdd();
+                entity.Property(e => e.Username).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.Email).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.PasswordHash).IsRequired();
+                entity.HasIndex(e => e.Email).IsUnique();
+                entity.HasIndex(e => e.Username).IsUnique();
             });
 
             // Transaction configurations
             modelBuilder.Entity<Transaction>(entity =>
             {
+                entity.ToTable("Transactions");
+                entity.HasKey(e => e.TransactionId);
+                entity.Property(e => e.Description).HasMaxLength(200);
+
                 entity.HasOne(d => d.User)
                     .WithMany(p => p.Transactions)
                     .HasForeignKey(d => d.UserId)
                     .OnDelete(DeleteBehavior.Cascade)
                     .IsRequired();
-            });
 
+                entity.HasOne(d => d.Category)
+                    .WithMany(p => p.Transactions)
+                    .HasForeignKey(d => d.CategoryId)
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .IsRequired();
+            });
 
             // Category configurations
             modelBuilder.Entity<Category>(entity =>
             {
+                entity.ToTable("Categories");
                 entity.HasKey(e => e.CategoryId);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(50);
                 entity.Property(e => e.Description).HasMaxLength(100);
@@ -71,46 +80,49 @@ namespace FinanceManager.Data
                 entity.HasOne(d => d.User)
                     .WithMany()
                     .HasForeignKey(d => d.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false); // Allow null for system categories
             });
 
             // Budget configurations
             modelBuilder.Entity<Budget>(entity =>
             {
+                entity.ToTable("Budgets");
                 entity.HasKey(e => e.BudgetId);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
-                entity.Property(e => e.Amount).HasColumnType("decimal(18,2)");
-                entity.Property(e => e.CurrentSpending).HasColumnType("decimal(18,2)");
 
                 entity.HasOne(d => d.User)
                     .WithMany(p => p.Budgets)
                     .HasForeignKey(d => d.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
                 entity.HasOne(d => d.Category)
                     .WithMany(p => p.Budgets)
                     .HasForeignKey(d => d.CategoryId)
-                    .OnDelete(DeleteBehavior.Restrict);
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .IsRequired();
             });
 
             // Goal configurations
             modelBuilder.Entity<Goal>(entity =>
             {
+                entity.ToTable("Goals");
                 entity.HasKey(e => e.GoalId);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.Description).HasMaxLength(500);
-                entity.Property(e => e.TargetAmount).HasColumnType("decimal(18,2)");
-                entity.Property(e => e.CurrentAmount).HasColumnType("decimal(18,2)");
 
                 entity.HasOne(d => d.User)
                     .WithMany(p => p.Goals)
                     .HasForeignKey(d => d.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
             });
 
             // Template configurations
             modelBuilder.Entity<Template>(entity =>
             {
+                entity.ToTable("Templates");
                 entity.HasKey(e => e.TemplateId);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(50);
                 entity.Property(e => e.Description).HasMaxLength(200);
@@ -120,7 +132,8 @@ namespace FinanceManager.Data
                 entity.HasOne(d => d.User)
                     .WithMany()
                     .HasForeignKey(d => d.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false); // Allow null for system templates
             });
 
             // Seed default categories
@@ -158,8 +171,8 @@ namespace FinanceManager.Data
                 new Category
                 {
                     CategoryId = 4,
-                    Name = "Salary",
-                    Description = "Regular Income",
+                    Name = "Income",
+                    Description = "Salary and Other Income",
                     Type = CategoryType.Income,
                     ColorCode = "#57FF33",
                     UserId = null,
@@ -175,18 +188,7 @@ namespace FinanceManager.Data
                     Name = "Student Budget",
                     Description = "Template for students with common expense categories",
                     Type = TemplateType.Student,
-                    Configuration = @"{
-                        ""categories"": [
-                            {""name"": ""Tuition"", ""type"": ""Expense"", ""color"": ""#FF5733""},
-                            {""name"": ""Books"", ""type"": ""Expense"", ""color"": ""#33FF57""},
-                            {""name"": ""Housing"", ""type"": ""Expense"", ""color"": ""#3357FF""},
-                            {""name"": ""Food"", ""type"": ""Expense"", ""color"": ""#FF33F5""}
-                        ],
-                        ""budgets"": [
-                            {""category"": ""Housing"", ""period"": ""Monthly""},
-                            {""category"": ""Food"", ""period"": ""Monthly""}
-                        ]
-                    }",
+                    Configuration = @"{""categories"":[{""name"":""Tuition"",""type"":""Expense"",""color"":""#FF5733""},{""name"":""Books"",""type"":""Expense"",""color"":""#33FF57""},{""name"":""Housing"",""type"":""Expense"",""color"":""#3357FF""},{""name"":""Food"",""type"":""Expense"",""color"":""#FF33F5""}],""budgets"":[{""category"":""Housing"",""period"":""Monthly""},{""category"":""Food"",""period"":""Monthly""}]}",
                     IsSystem = true
                 },
                 new Template
@@ -195,18 +197,7 @@ namespace FinanceManager.Data
                     Name = "Family Budget",
                     Description = "Template for families with household expenses",
                     Type = TemplateType.Family,
-                    Configuration = @"{
-                        ""categories"": [
-                            {""name"": ""Mortgage"", ""type"": ""Expense"", ""color"": ""#FF5733""},
-                            {""name"": ""Groceries"", ""type"": ""Expense"", ""color"": ""#33FF57""},
-                            {""name"": ""Utilities"", ""type"": ""Expense"", ""color"": ""#3357FF""},
-                            {""name"": ""Education"", ""type"": ""Expense"", ""color"": ""#FF33F5""}
-                        ],
-                        ""budgets"": [
-                            {""category"": ""Groceries"", ""period"": ""Monthly""},
-                            {""category"": ""Utilities"", ""period"": ""Monthly""}
-                        ]
-                    }",
+                    Configuration = @"{""categories"":[{""name"":""Mortgage"",""type"":""Expense"",""color"":""#FF5733""},{""name"":""Groceries"",""type"":""Expense"",""color"":""#33FF57""},{""name"":""Utilities"",""type"":""Expense"",""color"":""#3357FF""},{""name"":""Education"",""type"":""Expense"",""color"":""#FF33F5""}],""budgets"":[{""category"":""Groceries"",""period"":""Monthly""},{""category"":""Utilities"",""period"":""Monthly""}]}",
                     IsSystem = true
                 },
                 new Template
@@ -215,18 +206,7 @@ namespace FinanceManager.Data
                     Name = "Investor Portfolio",
                     Description = "Template for investment tracking",
                     Type = TemplateType.Investor,
-                    Configuration = @"{
-                        ""categories"": [
-                            {""name"": ""Stocks"", ""type"": ""Investment"", ""color"": ""#FF5733""},
-                            {""name"": ""Bonds"", ""type"": ""Investment"", ""color"": ""#33FF57""},
-                            {""name"": ""Real Estate"", ""type"": ""Investment"", ""color"": ""#3357FF""},
-                            {""name"": ""Dividends"", ""type"": ""Income"", ""color"": ""#FF33F5""}
-                        ],
-                        ""goals"": [
-                            {""name"": ""Retirement Fund"", ""type"": ""Investment""},
-                            {""name"": ""Emergency Fund"", ""type"": ""Saving""}
-                        ]
-                    }",
+                    Configuration = @"{""categories"":[{""name"":""Stocks"",""type"":""Investment"",""color"":""#FF5733""},{""name"":""Bonds"",""type"":""Investment"",""color"":""#33FF57""},{""name"":""Real Estate"",""type"":""Investment"",""color"":""#3357FF""},{""name"":""Dividends"",""type"":""Income"",""color"":""#FF33F5""}],""goals"":[{""name"":""Retirement Fund"",""type"":""Investment""},{""name"":""Emergency Fund"",""type"":""Saving""}]}",
                     IsSystem = true
                 }
             );

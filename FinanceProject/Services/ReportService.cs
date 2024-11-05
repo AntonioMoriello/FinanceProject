@@ -6,6 +6,7 @@ using DinkToPdf;
 using DinkToPdf.Contracts;
 using OfficeOpenXml;
 using System.Text;
+using FinanceManager.Root;
 
 namespace FinanceManager.Services
 {
@@ -374,8 +375,8 @@ namespace FinanceManager.Services
                 if (worksheet.Dimension != null)
                 {
                     worksheet.Cells[worksheet.Dimension.Address].AutoFitColumns();
-                } 
-            } 
+                }
+            }
             catch (Exception ex)
             {
                 throw new Exception($"Failed to generate financial summary Excel: {ex.Message}", ex);
@@ -708,6 +709,169 @@ namespace FinanceManager.Services
             }
         }
 
-        // Keep the HTML generation methods as they are since they're working fine
+        public async Task<FinancialSummaryViewModel> GetMonthlyFinancialSummaryAsync(int userId, DateTime date)
+        {
+            try
+            {
+                var startDate = date.StartOfMonth();
+                var endDate = date.EndOfMonth();
+
+                // Get all transactions for the month
+                var transactions = await _context.Transactions
+                    .Include(t => t.Category)
+                    .Where(t => t.UserId == userId &&
+                               t.Date >= startDate &&
+                               t.Date <= endDate)
+                    .ToListAsync();
+
+                // Calculate totals
+                var totalIncome = transactions
+                    .Where(t => t.Type == TransactionType.Income)
+                    .Sum(t => t.Amount);
+
+                var totalExpenses = transactions
+                    .Where(t => t.Type == TransactionType.Expense)
+                    .Sum(t => t.Amount);
+
+                // Calculate category totals
+                var categoryTotals = transactions
+                    .GroupBy(t => t.Category.Name)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Sum(t => t.Amount)
+                    );
+
+                // Calculate category percentages
+                var categoryPercentages = new Dictionary<string, decimal>();
+                if (totalExpenses > 0)
+                {
+                    foreach (var category in categoryTotals)
+                    {
+                        categoryPercentages[category.Key] =
+                            Math.Round((category.Value / totalExpenses) * 100, 2);
+                    }
+                }
+
+                // Get monthly totals for trending
+                var monthlyTotals = new Dictionary<string, decimal>
+        {
+            { date.ToString("yyyy-MM"), totalIncome - totalExpenses }
+        };
+
+                // Get recent transactions
+                var recentTransactions = transactions
+                    .OrderByDescending(t => t.Date)
+                    .Take(5);
+
+                return new FinancialSummaryViewModel
+                {
+                    TotalIncome = totalIncome,
+                    TotalExpenses = totalExpenses,
+                    NetIncome = totalIncome - totalExpenses,
+                    CategoryTotals = categoryTotals,
+                    MonthlyTotals = monthlyTotals,
+                    CategoryPercentages = categoryPercentages,
+                    RecentTransactions = recentTransactions
+                };
+            }
+
+            catch (Exception ex)
+            {
+                throw new Exception($"Error generating monthly financial summary for userId: {userId}, date: {date}", ex);
+            }
+        }
+
+        public async Task<FinancialSummaryViewModel> GetQuarterlyFinancialSummaryAsync(int userId, DateTime date)
+        {
+            try
+            {
+                var startDate = date.StartOfQuarter();
+                var endDate = date.EndOfQuarter();
+                var quarterNumber = date.GetQuarter();
+
+                // Get all transactions for the quarter
+                var transactions = await _context.Transactions
+                    .Include(t => t.Category)
+                    .Where(t => t.UserId == userId &&
+                               t.Date >= startDate &&
+                               t.Date <= endDate)
+                    .ToListAsync();
+
+                // Group transactions by month for the quarter
+                var monthlyData = transactions
+                    .GroupBy(t => new { t.Date.Year, t.Date.Month })
+                    .OrderBy(g => g.Key.Year)
+                    .ThenBy(g => g.Key.Month)
+                    .ToDictionary(
+                        g => $"{g.Key.Year}-{g.Key.Month:D2}",
+                        g => new
+                        {
+                            Income = g.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount),
+                            Expenses = g.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount)
+                        }
+                    );
+
+                // Calculate quarter totals
+                var totalIncome = transactions
+                    .Where(t => t.Type == TransactionType.Income)
+                    .Sum(t => t.Amount);
+
+                var totalExpenses = transactions
+                    .Where(t => t.Type == TransactionType.Expense)
+                    .Sum(t => t.Amount);
+
+                // Calculate category breakdowns
+                var categoryTotals = transactions
+                    .GroupBy(t => t.Category.Name)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Sum(t => t.Amount)
+                    );
+
+                // Calculate category percentages
+                var categoryPercentages = new Dictionary<string, decimal>();
+                if (totalExpenses > 0)
+                {
+                    foreach (var category in categoryTotals)
+                    {
+                        categoryPercentages[category.Key] =
+                            Math.Round((category.Value / totalExpenses) * 100, 2);
+                    }
+                }
+
+                // Create monthly totals dictionary
+                var monthlyTotals = monthlyData
+                    .ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => kvp.Value.Income - kvp.Value.Expenses
+                    );
+
+                // Get recent transactions
+                var recentTransactions = transactions
+                    .OrderByDescending(t => t.Date)
+                    .Take(5);
+
+                return new FinancialSummaryViewModel
+                {
+                    TotalIncome = totalIncome,
+                    TotalExpenses = totalExpenses,
+                    NetIncome = totalIncome - totalExpenses,
+                    CategoryTotals = categoryTotals,
+                    MonthlyTotals = monthlyTotals,
+                    CategoryPercentages = categoryPercentages,
+                    RecentTransactions = recentTransactions,
+                    Period = $"Q{quarterNumber} {date.Year}",
+                    StartDate = startDate,
+                    EndDate = endDate,
+                    ReportType = "Quarterly"
+                };
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error generating quarterly financial summary for userId: {userId}, date: {date}", ex);
+            }
+        }
+
+
     }
 }

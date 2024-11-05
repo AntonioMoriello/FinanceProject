@@ -1,35 +1,122 @@
-@model BudgetDetailsViewModel
+<dt class="col-sm-4">End Date</dt>
+<dd class="col-sm-8">@Model.Budget.EndDate?.ToShortDateString() ?? "Ongoing"</dd>
 
-@{
-    ViewData["Title"] = "Budget Details";
-}
+<dt class="col-sm-4">Allocated Amount</dt>
+<dd class="col-sm-8">@Model.Budget.Amount.ToString("C")</dd>
 
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-md-8">
-            <div class="card shadow mb-4">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h4 class="card-title mb-0">@Model.Budget.Name</h4>
-                    <div>
-                        <a asp-action="Edit" asp-route-id="@Model.Budget.BudgetId"
-                           class="btn btn-light btn-sm">
-                            <i class="fas fa-edit"></i> Edit
-                        </a>
+<dt class="col-sm-4">Total Spent</dt>
+<dd class="col-sm-8">@Model.TotalSpent.ToString("C")</dd>
+
+<dt class="col-sm-4">Remaining Amount</dt>
+<dd class="col-sm-8" style="color: @(Model.RemainingAmount < 0 ? "red" : "green")">
+    @Model.RemainingAmount.ToString("C")
+</dd>
+                            </dl>
+                        </div>
+<div class="col-md-6">
+    <h5>Progress</h5>
+    <div class="progress mb-3">
+        <div class="progress-bar @((Model.TotalSpent / Model.Budget.Amount) >= 1 ? "bg-danger" : "bg-success")"
+             role="progressbar"
+             style="width: @(Model.Budget.Amount == 0 ? 0 : ((Model.TotalSpent / Model.Budget.Amount) * 100))%"
+             aria-valuenow="@(Model.TotalSpent)"
+             aria-valuemin="0"
+             aria-valuemax="@(Model.Budget.Amount)">
+            @((Model.Budget.Amount == 0) ? "N/A" : ((Model.TotalSpent / Model.Budget.Amount) * 100).ToString("F1") + "%")
+        </div>
+    </div>
+</div>
                     </div>
                 </div>
-                <div class="card-body">
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <h5>Budget Information</h5>
-                            <dl class="row">
-                                <dt class="col-sm-4">Category</dt>
-                                <dd class="col-sm-8">@Model.Budget.Category.Name</dd>
+            </div>
 
-                                <dt class="col-sm-4">Period</dt>
-                                <dd class="col-sm-8">@Model.Budget.Period</dd>
+<!-- Transactions List for this Budget -->
+<div class="card shadow">
+    <div class="card-header bg-secondary text-white">
+        <h5 class="card-title mb-0">Transactions</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th class="text-end">Amount</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var transaction in Model.Transactions)
+                    {
+                        <tr>
+                            <td>@transaction.Date.ToShortDateString()</td>
+                            <td>@transaction.Description</td>
+                            <td class="text-end">@transaction.Amount.ToString("C")</td>
+                            <td>
+                                <a asp-action="Details" asp-route-id="@transaction.TransactionId"
+                                   class="btn btn-sm btn-outline-info">
+                                    <i class="fas fa-info-circle"></i> Details
+                                </a>
+                                <a asp-action="EditTransaction" asp-route-id="@transaction.TransactionId"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i> Edit
+                                </a>
+                                <a asp-action="DeleteTransaction" asp-route-id="@transaction.TransactionId"
+                                   class="btn btn-sm btn-outline-danger">
+                                    <i class="fas fa-trash"></i> Delete
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+        </div>
 
-                                <dt class="col-sm-4">Start Date</dt>
-                                <dd class="col-sm-8">@Model.Budget.StartDate.ToShortDateString()</dd>
+<!-- Budget Summary Chart -->
+<div class="col-md-4">
+    <div class="card shadow mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="card-title mb-0">Budget Summary</h5>
+        </div>
+        <div class="card-body">
+            <canvas id="budgetChart" height="250"></canvas>
+        </div>
+    </div>
+</div>
+    </div>
+</div>
 
-                                <dt class="col-sm-4">End Date</dt>
-                                <dd class="col-sm-8">@Model.Budget
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // Initialize budget summary chart
+            const ctx = document.getElementById('budgetChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Spent', 'Remaining'],
+                    datasets: [{
+                        data: [
+        @Model.TotalSpent,
+        @Model.Budget.Amount - @Model.TotalSpent
+                        ],
+                        backgroundColor: ['#FF6384', '#36A2EB']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+}

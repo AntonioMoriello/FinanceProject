@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using FinanceManager.Data;
 using FinanceManager.Models;
+using FinanceManager.Root;
 
 namespace FinanceManager.Services
 {
@@ -27,25 +28,41 @@ namespace FinanceManager.Services
             _logger = logger;
         }
 
-        public async Task<IEnumerable<Transaction>> GetUserTransactionsAsync(int userId, DateTime? startDate = null, DateTime? endDate = null, int? categoryId = null, TransactionType? type = null)
+        public async Task<IEnumerable<Transaction>> GetUserTransactionsAsync(
+    int userId,
+    DateTime? startDate = null,
+    DateTime? endDate = null,
+    int? categoryId = null,
+    TransactionType? type = null)
         {
-            var query = _context.Transactions
-                .Include(t => t.Category)
-                .Where(t => t.UserId == userId);
+            try
+            {
+                var query = _context.Transactions
+                    .Include(t => t.Category)
+                    .Include(t => t.User)
+                    .Where(t => t.UserId == userId);
 
-            if (startDate.HasValue)
-                query = query.Where(t => t.Date >= startDate.Value);
+                if (startDate.HasValue)
+                    query = query.Where(t => t.Date >= startDate.Value.StartOfDay());
 
-            if (endDate.HasValue)
-                query = query.Where(t => t.Date <= endDate.Value);
+                if (endDate.HasValue)
+                    query = query.Where(t => t.Date <= endDate.Value.EndOfDay());
 
-            if (categoryId.HasValue)
-                query = query.Where(t => t.CategoryId == categoryId.Value);
+                if (categoryId.HasValue)
+                    query = query.Where(t => t.CategoryId == categoryId.Value);
 
-            if (type.HasValue)
-                query = query.Where(t => t.Type == type.Value);
+                if (type.HasValue)
+                    query = query.Where(t => t.Type == type.Value);
 
-            return await query.OrderByDescending(t => t.Date).ToListAsync();
+                return await query
+                    .OrderByDescending(t => t.Date)
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting user transactions for userId: {UserId}", userId);
+                return new List<Transaction>();
+            }
         }
 
         public async Task<Transaction> GetTransactionByIdAsync(int transactionId, int userId)
@@ -57,30 +74,28 @@ namespace FinanceManager.Services
 
         public async Task<Transaction> CreateTransactionAsync(Transaction transaction)
         {
-            // Validate required fields
-            if (transaction == null)
-                throw new ArgumentNullException(nameof(transaction));
-
-            if (transaction.UserId <= 0)
-                throw new ArgumentException("Invalid UserId");
-
-            if (transaction.CategoryId <= 0)
-                throw new ArgumentException("Invalid CategoryId");
-
-            if (transaction.Amount <= 0)
-                throw new ArgumentException("Amount must be greater than zero");
-
             try
             {
-                // Verify that the category exists and belongs to the user or is a system category
+                // Validate required fields
+                if (transaction == null)
+                    throw new ArgumentNullException(nameof(transaction));
+
+                if (transaction.UserId <= 0)
+                    throw new ArgumentException("Invalid UserId");
+
+                if (transaction.CategoryId <= 0)
+                    throw new ArgumentException("Invalid CategoryId");
+
+                if (transaction.Amount <= 0)
+                    throw new ArgumentException("Amount must be greater than zero");
+
+                // Verify category exists and belongs to user or is system
                 var category = await _context.Categories
-                    .FirstOrDefaultAsync(c => c.CategoryId == transaction.CategoryId);
+                    .FirstOrDefaultAsync(c => c.CategoryId == transaction.CategoryId &&
+                        (c.UserId == transaction.UserId || c.IsSystem));
 
                 if (category == null)
-                    throw new InvalidOperationException($"Category with ID {transaction.CategoryId} not found");
-
-                if (!category.IsSystem && category.UserId != transaction.UserId)
-                    throw new InvalidOperationException("Selected category does not belong to the user");
+                    throw new InvalidOperationException($"Category with ID {transaction.CategoryId} not found or not accessible");
 
                 // Verify user exists
                 var userExists = await _context.Users
@@ -89,40 +104,26 @@ namespace FinanceManager.Services
                 if (!userExists)
                     throw new InvalidOperationException($"User with ID {transaction.UserId} not found");
 
-                // Validate recurring transaction data if applicable
+                // Set up recurring transaction if needed
                 if (transaction.IsRecurring)
                 {
                     if (string.IsNullOrEmpty(transaction.RecurrencePattern))
                         throw new InvalidOperationException("Recurrence pattern is required for recurring transactions");
 
-                    if (!IsValidRecurrencePattern(transaction.RecurrencePattern))
-                        throw new InvalidOperationException("Invalid recurrence pattern");
-
-                    if (!transaction.NextRecurrenceDate.HasValue)
-                        throw new InvalidOperationException("Next recurrence date is required for recurring transactions");
+                    transaction.NextRecurrenceDate = CalculateNextRecurrenceDate(
+                        transaction.Date,
+                        transaction.RecurrencePattern);
                 }
-
-                // Log the transaction details before saving
-                _logger.LogInformation(
-                    "Saving transaction: User={UserId}, Category={CategoryId}, Amount={Amount}, IsRecurring={IsRecurring}",
-                    transaction.UserId,
-                    transaction.CategoryId,
-                    transaction.Amount,
-                    transaction.IsRecurring);
 
                 _context.Transactions.Add(transaction);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Transaction saved successfully with ID {TransactionId}",
-                    transaction.TransactionId);
-
                 return transaction;
             }
-            catch (DbUpdateException ex)
+            catch (Exception ex)
             {
-                _logger.LogError(ex, "Database error while saving transaction: {Message}",
-                    ex.InnerException?.Message ?? ex.Message);
-                throw new Exception("Failed to save the transaction. Please try again or contact support if the problem persists.");
+                _logger.LogError(ex, "Error creating transaction for userId: {UserId}", transaction?.UserId);
+                throw;
             }
         }
 
@@ -132,11 +133,35 @@ namespace FinanceManager.Services
             return validPatterns.Contains(pattern.ToLower());
         }
 
-    public async Task<Transaction> UpdateTransactionAsync(Transaction transaction)
+        public async Task<Transaction> UpdateTransactionAsync(Transaction transaction)
         {
-            _context.Entry(transaction).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
-            return transaction;
+            try
+            {
+                var existingTransaction = await _context.Transactions
+                    .FirstOrDefaultAsync(t => t.TransactionId == transaction.TransactionId &&
+                        t.UserId == transaction.UserId);
+
+                if (existingTransaction == null)
+                    throw new InvalidOperationException("Transaction not found or unauthorized");
+
+                // Update only allowed fields
+                existingTransaction.Amount = transaction.Amount;
+                existingTransaction.Description = transaction.Description;
+                existingTransaction.Date = transaction.Date;
+                existingTransaction.CategoryId = transaction.CategoryId;
+                existingTransaction.Type = transaction.Type;
+                existingTransaction.IsRecurring = transaction.IsRecurring;
+                existingTransaction.RecurrencePattern = transaction.RecurrencePattern;
+                existingTransaction.NextRecurrenceDate = transaction.NextRecurrenceDate;
+
+                await _context.SaveChangesAsync();
+                return existingTransaction;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating transaction: {TransactionId}", transaction.TransactionId);
+                throw;
+            }
         }
 
         public async Task DeleteTransactionAsync(int transactionId, int userId)
@@ -230,7 +255,10 @@ namespace FinanceManager.Services
 
         private DateTime? CalculateNextRecurrenceDate(DateTime currentDate, string pattern)
         {
-            return pattern?.ToLower() switch
+            if (string.IsNullOrEmpty(pattern))
+                return null;
+
+            return pattern.ToLower() switch
             {
                 "daily" => currentDate.AddDays(1),
                 "weekly" => currentDate.AddDays(7),

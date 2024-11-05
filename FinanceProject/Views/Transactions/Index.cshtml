@@ -96,7 +96,6 @@
                     </thead>
                     <tbody>
                         @foreach (var transaction in Model.Transactions)
-
                         {
                             <tr>
                                 <td>@transaction.Date.ToShortDateString()</td>
@@ -167,13 +166,12 @@
                             </thead>
                             <tbody>
                                 @foreach (var category in Model.CategoryTotals)
-
                                 {
                                     <tr>
                                         <td>@category.Key</td>
                                         <td class="text-end">@category.Value.ToString("C")</td>
                                         <td class="text-end">
-                                            @(((category.Value / Model.TotalExpenses) * 100).ToString("F1"))%
+                                            @(Model.TotalExpenses == 0 ? "N/A" : ((category.Value / Model.TotalExpenses) * 100).ToString("F1") + "%")
                                         </td>
                                     </tr>
                                 }

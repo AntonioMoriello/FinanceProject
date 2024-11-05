@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using FinanceManager.Data;
 using FinanceManager.Models;
+using System.Text;
 
 namespace FinanceManager.Services
 {
@@ -19,49 +20,54 @@ namespace FinanceManager.Services
     public class AccountService : IAccountService
     {
         private readonly ApplicationDbContext _context;
+        private readonly ILogger<AccountService> _logger;
 
-        public AccountService(ApplicationDbContext context)
+        public AccountService(ApplicationDbContext context, ILogger<AccountService> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         public async Task<(bool success, string message, int userId)> RegisterUserAsync(User user, string password)
         {
+            using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
+                // Validate unique email
                 if (await _context.Users.AnyAsync(u => u.Email == user.Email))
-                {
                     return (false, "Email already exists", 0);
-                }
 
+                // Validate unique username
                 if (await _context.Users.AnyAsync(u => u.Username == user.Username))
-                {
                     return (false, "Username already exists", 0);
-                }
 
-                // Hash the password
+                // Hash password
                 user.PasswordHash = HashPassword(password);
                 user.SecurityStamp = Guid.NewGuid().ToString();
+                user.CreatedDate = DateTime.UtcNow;
+                user.IsActive = true;
 
-                // Explicitly add the user to the context
                 _context.Users.Add(user);
                 await _context.SaveChangesAsync();
 
-                // Verify the user was saved and get their ID
-                var savedUser = await _context.Users
-                    .FirstOrDefaultAsync(u => u.Email == user.Email);
-
-                if (savedUser == null)
+                // Create default categories for the user
+                var defaultCategories = new[]
                 {
-                    throw new Exception("Failed to save user to database");
-                }
+                new Category { Name = "Entertainment", Type = CategoryType.Expense, UserId = user.UserId },
+                new Category { Name = "Healthcare", Type = CategoryType.Expense, UserId = user.UserId },
+                new Category { Name = "Shopping", Type = CategoryType.Expense, UserId = user.UserId }
+            };
 
-                return (true, "Registration successful", savedUser.UserId);
+                _context.Categories.AddRange(defaultCategories);
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return (true, "Registration successful", user.UserId);
             }
             catch (Exception ex)
             {
-                // Log the error
-                
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Error registering user: {Email}", user.Email);
                 return (false, "Registration failed. Please try again.", 0);
             }
         }
@@ -112,11 +118,10 @@ namespace FinanceManager.Services
 
         private string HashPassword(string password)
         {
-            using (var sha256 = SHA256.Create())
-            {
-                var hashedBytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
-                return Convert.ToBase64String(hashedBytes);
-            }
+            using var sha256 = SHA256.Create();
+            var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
+            return Convert.ToBase64String(hashedBytes);
         }
+
     }
 }
