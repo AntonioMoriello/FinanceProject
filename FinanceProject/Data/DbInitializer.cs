@@ -1,4 +1,7 @@
+using Microsoft.EntityFrameworkCore;
 using FinanceManager.Models;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace FinanceManager.Data
 {
@@ -6,26 +9,48 @@ namespace FinanceManager.Data
     {
         public static async Task Initialize(ApplicationDbContext context)
         {
-            // Make sure the database is created
-            context.Database.EnsureCreated();
-
-            // Check if there are any records
-            if (context.Categories.Any())
+            // Add default categories if they don't exist
+            if (!await context.Categories.AnyAsync())
             {
-                return; // DB has been seeded
+                var defaultCategories = new List<Category>
+                {
+                    new Category
+                    {
+                        Name = "Housing",
+                        Description = "Rent, Mortgage, Utilities",
+                        Type = CategoryType.Expense,
+                        ColorCode = "#FF5733",
+                        IsSystem = true
+                    },
+                    new Category
+                    {
+                        Name = "Food",
+                        Description = "Groceries and Dining",
+                        Type = CategoryType.Expense,
+                        ColorCode = "#33FF57",
+                        IsSystem = true
+                    },
+                    new Category
+                    {
+                        Name = "Transportation",
+                        Description = "Car, Gas, Public Transit",
+                        Type = CategoryType.Expense,
+                        ColorCode = "#3357FF",
+                        IsSystem = true
+                    },
+                    new Category
+                    {
+                        Name = "Income",
+                        Description = "Salary and Other Income",
+                        Type = CategoryType.Income,
+                        ColorCode = "#57FF33",
+                        IsSystem = true
+                    }
+                };
+
+                await context.Categories.AddRangeAsync(defaultCategories);
+                await context.SaveChangesAsync();
             }
-
-            // Add default categories
-            var defaultCategories = new Category[]
-            {
-                new Category { Name = "Housing", Description = "Rent, Mortgage, Utilities", Type = CategoryType.Expense, ColorCode = "#FF5733", IsSystem = true },
-                new Category { Name = "Food", Description = "Groceries and Dining", Type = CategoryType.Expense, ColorCode = "#33FF57", IsSystem = true },
-                new Category { Name = "Transportation", Description = "Car, Gas, Public Transit", Type = CategoryType.Expense, ColorCode = "#3357FF", IsSystem = true },
-                new Category { Name = "Income", Description = "Salary and Other Income", Type = CategoryType.Income, ColorCode = "#57FF33", IsSystem = true }
-            };
-
-            context.Categories.AddRange(defaultCategories);
-            await context.SaveChangesAsync();
         }
     }
 }

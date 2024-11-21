@@ -10,7 +10,13 @@ using FinanceManager.Models;
 using System.Runtime.InteropServices;
 using FinanceManager;
 using FinanceManager.FinanceManager;
-
+using Microsoft.EntityFrameworkCore.SqlServer; // Add this line
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using SendGrid;
+using SendGrid.Helpers.Mail;
+using System;
+using System.Threading.Tasks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,7 +38,15 @@ builder.Services.AddSingleton(typeof(IConverter), new SynchronizedConverter(new 
 // Add DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection"));
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    options.UseSqlServer(connectionString, sqlOptions =>
+    {
+        sqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            errorNumbersToAdd: null);
+    });
+
     if (builder.Environment.IsDevelopment())
     {
         options.EnableSensitiveDataLogging();
@@ -46,6 +60,9 @@ builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddScoped<IGoalService, GoalService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.Configure<EmailSettings>(
+    builder.Configuration.GetSection("EmailSettings"));
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 // Configure Authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -87,40 +104,43 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 // Initialize Database
-using (var scope = app.Services.CreateScope())
+try
 {
-    var services = scope.ServiceProvider;
-    try
+    using (var scope = app.Services.CreateScope())
     {
-        var dbContext = services.GetRequiredService<ApplicationDbContext>();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
-        // Only create database if it doesn't exist
-        await dbContext.Database.EnsureCreatedAsync();
+        // Create execution strategy
+        var strategy = context.Database.CreateExecutionStrategy();
 
-        // Add default categories if they don't exist
-        if (!dbContext.Categories.Any())
+        await strategy.ExecuteAsync(async () =>
         {
-            var defaultCategories = new List<Category>
+            if (!await context.Database.CanConnectAsync())
             {
-                new Category { Name = "Housing", Description = "Rent, Mortgage, Utilities", Type = CategoryType.Expense, ColorCode = "#FF5733", IsSystem = true },
-                new Category { Name = "Food", Description = "Groceries and Dining", Type = CategoryType.Expense, ColorCode = "#33FF57", IsSystem = true },
-                new Category { Name = "Transportation", Description = "Car, Gas, Public Transit", Type = CategoryType.Expense, ColorCode = "#3357FF", IsSystem = true },
-                new Category { Name = "Income", Description = "Salary and Other Income", Type = CategoryType.Income, ColorCode = "#57FF33", IsSystem = true }
-            };
+                logger.LogWarning("Unable to connect to database. Attempting to create database...");
+                await context.Database.EnsureCreatedAsync();
+            }
 
-            await dbContext.Categories.AddRangeAsync(defaultCategories);
-            await dbContext.SaveChangesAsync();
-        }
-
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogInformation("Database initialized successfully");
+            // Check if we need to initialize default data
+            if (!await context.Categories.AnyAsync())
+            {
+                logger.LogInformation("Initializing database with default data...");
+                await DbInitializer.Initialize(context);
+                logger.LogInformation("Database initialized successfully");
+            }
+            else
+            {
+                logger.LogInformation("Database already contains data. Skipping initialization.");
+            }
+        });
     }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while initializing the database.");
-        throw; // Re-throw to prevent the app from starting with an invalid database
-    }
+}
+catch (Exception ex)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogError(ex, "An error occurred while initializing the database.");
+    throw;
 }
 
 app.Run();

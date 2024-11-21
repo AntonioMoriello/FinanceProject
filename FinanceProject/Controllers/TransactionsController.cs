@@ -6,6 +6,7 @@ using FinanceManager.Models.ViewModels;
 using FinanceManager.Services;
 using FinanceManager.Data;
 using System.Security.Claims;
+using Microsoft.Extensions.Logging;
 
 namespace FinanceManager.Controllers
 {
@@ -29,6 +30,19 @@ namespace FinanceManager.Controllers
         private int GetUserId()
         {
             return int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+        }
+
+        // Move the CalculateNextRecurrenceDate method inside the class
+        private DateTime? CalculateNextRecurrenceDate(DateTime currentDate, string pattern)
+        {
+            return pattern?.ToLower() switch
+            {
+                "daily" => currentDate.AddDays(1),
+                "weekly" => currentDate.AddDays(7),
+                "monthly" => currentDate.AddMonths(1),
+                "yearly" => currentDate.AddYears(1),
+                _ => null
+            };
         }
 
         // GET: Transactions
@@ -150,6 +164,28 @@ namespace FinanceManager.Controllers
                 .ToListAsync();
         }
 
+        // GET: Transactions/Details/5
+        public async Task<IActionResult> Details(int id)
+        {
+            try
+            {
+                var userId = GetUserId();
+                var transaction = await _context.Transactions
+                    .Include(t => t.Category)
+                    .FirstOrDefaultAsync(t => t.TransactionId == id && t.UserId == userId);
+
+                if (transaction == null)
+                    return NotFound();
+
+                return View(transaction);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving transaction details for ID: {TransactionId}", id);
+                TempData["ErrorMessage"] = "Error retrieving transaction details.";
+                return RedirectToAction(nameof(Index));
+            }
+        }
 
 
         // GET: Transactions/Edit/5
@@ -221,7 +257,9 @@ namespace FinanceManager.Controllers
         public async Task<IActionResult> Delete(int id)
         {
             var userId = GetUserId();
-            var transaction = await _transactionService.GetTransactionByIdAsync(id, userId);
+            var transaction = await _context.Transactions
+                .Include(t => t.Category)
+                .FirstOrDefaultAsync(t => t.TransactionId == id && t.UserId == userId);
 
             if (transaction == null)
                 return NotFound();
@@ -230,25 +268,50 @@ namespace FinanceManager.Controllers
         }
 
         // POST: Transactions/Delete/5
-        [HttpPost, ActionName("Delete")]
+        [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var userId = GetUserId();
-            await _transactionService.DeleteTransactionAsync(id, userId);
-            return RedirectToAction(nameof(Index));
-        }
-
-        private DateTime? CalculateNextRecurrenceDate(DateTime currentDate, string pattern)
-        {
-            return pattern?.ToLower() switch
+            try
             {
-                "daily" => currentDate.AddDays(1),
-                "weekly" => currentDate.AddDays(7),
-                "monthly" => currentDate.AddMonths(1),
-                "yearly" => currentDate.AddYears(1),
-                _ => null
-            };
+                var userId = GetUserId();
+                var strategy = _context.Database.CreateExecutionStrategy();
+
+                await strategy.ExecuteAsync(async () =>
+                {
+                    using var transaction = await _context.Database.BeginTransactionAsync();
+                    try
+                    {
+                        var transactionToDelete = await _context.Transactions
+                            .FirstOrDefaultAsync(t => t.TransactionId == id && t.UserId == userId);
+
+                        if (transactionToDelete != null)
+                        {
+                            _context.Transactions.Remove(transactionToDelete);
+                            await _context.SaveChangesAsync();
+                            await transaction.CommitAsync();
+                        }
+                    }
+                    catch
+                    {
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                });
+
+                TempData["SuccessMessage"] = "Transaction deleted successfully.";
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting transaction: {TransactionId}", id);
+                TempData["ErrorMessage"] = "Error deleting transaction.";
+                return RedirectToAction(nameof(Index));
+            }
         }
     }
 }
+   
+           
+        
+    

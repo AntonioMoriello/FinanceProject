@@ -6,6 +6,7 @@ using FinanceManager.Models.ViewModels;
 using FinanceManager.Services;
 using FinanceManager.Data;
 using System.Security.Claims;
+using Microsoft.Extensions.Logging;
 
 namespace FinanceManager.Controllers;
 
@@ -45,29 +46,31 @@ public class BudgetsController : Controller
             return View(viewModel);
         }
 
-        // GET: Budgets/Details/5
-        public async Task<IActionResult> Details(int id)
+    // GET: Budgets/Details/5
+    public async Task<IActionResult> Details(int id)
+    {
+        var userId = GetUserId();
+        var budget = await _budgetService.GetBudgetByIdAsync(id, userId);
+
+        if (budget == null)
+            return NotFound();
+
+        var currentSpending = await _budgetService.CalculateCurrentSpendingAsync(id, userId);
+        var spendingPercentages = await _budgetService.GetSpendingPercentagesAsync(new[] { budget });
+        var remainingAmounts = await _budgetService.GetRemainingAmountsAsync(new[] { budget });
+        var recentTransactions = await _budgetService.GetRecentTransactionsAsync(id, userId);
+
+        var viewModel = new BudgetDetailsViewModel
         {
-            var userId = GetUserId();
-            var budget = await _budgetService.GetBudgetByIdAsync(id, userId);
+            Budget = budget,
+            SpendingPercentage = spendingPercentages[budget.BudgetId],
+            RemainingAmount = remainingAmounts[budget.BudgetId],
+            TotalSpent = currentSpending,  // Set this value
+            RecentTransactions = recentTransactions
+        };
 
-            if (budget == null)
-                return NotFound();
-
-            var spendingPercentages = await _budgetService.GetSpendingPercentagesAsync(new[] { budget });
-            var remainingAmounts = await _budgetService.GetRemainingAmountsAsync(new[] { budget });
-            var recentTransactions = await _budgetService.GetRecentTransactionsAsync(id, userId);
-
-            var viewModel = new BudgetDetailsViewModel
-            {
-                Budget = budget,
-                SpendingPercentage = spendingPercentages[budget.BudgetId],
-                RemainingAmount = remainingAmounts[budget.BudgetId],
-                RecentTransactions = recentTransactions
-            };
-
-            return View(viewModel);
-        }
+        return View(viewModel);
+    }
 
     // GET: Budgets/Create
     public async Task<IActionResult> Create()
@@ -177,8 +180,28 @@ public class BudgetsController : Controller
             return View(viewModel);
         }
 
-        // GET: Budgets/Delete/5
-        public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id)
+    {
+        var userId = GetUserId();
+        var budget = await _budgetService.GetBudgetByIdAsync(id, userId);
+
+        if (budget == null)
+            return NotFound();
+
+        // Include navigation properties needed for the view
+        await _context.Entry(budget)
+            .Reference(b => b.Category)
+            .LoadAsync();
+
+        return View(budget);
+    }
+
+    // POST: Budgets/Delete/5
+    [HttpPost, ActionName("Delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteConfirmed(int id)
+    {
+        try
         {
             var userId = GetUserId();
             var budget = await _budgetService.GetBudgetByIdAsync(id, userId);
@@ -186,21 +209,19 @@ public class BudgetsController : Controller
             if (budget == null)
                 return NotFound();
 
-            return View(budget);
-        }
-
-        // POST: Budgets/Delete/5
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
-        {
-            var userId = GetUserId();
             await _budgetService.DeleteBudgetAsync(id, userId);
+            TempData["SuccessMessage"] = "Budget deleted successfully!";
             return RedirectToAction(nameof(Index));
         }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = "Error deleting budget. Please try again.";
+            return RedirectToAction(nameof(Delete), new { id });
+        }
+    }
 
-        // GET: Budgets/Progress/5
-        public async Task<IActionResult> Progress(int id)
+    // GET: Budgets/Progress/5
+    public async Task<IActionResult> Progress(int id)
         {
             var userId = GetUserId();
             var budget = await _budgetService.GetBudgetByIdAsync(id, userId);

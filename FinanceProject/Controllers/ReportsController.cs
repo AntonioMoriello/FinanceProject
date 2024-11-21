@@ -6,6 +6,7 @@ using FinanceManager.Models.ViewModels;
 using FinanceManager.Services;
 using FinanceManager.Data;
 using System.Security.Claims;
+using Microsoft.Extensions.Logging;
 
 namespace FinanceManager.Controllers
 {

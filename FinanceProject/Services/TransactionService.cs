@@ -166,13 +166,37 @@ namespace FinanceManager.Services
 
         public async Task DeleteTransactionAsync(int transactionId, int userId)
         {
-            var transaction = await _context.Transactions
-                .FirstOrDefaultAsync(t => t.TransactionId == transactionId && t.UserId == userId);
-
-            if (transaction != null)
+            try
             {
-                _context.Transactions.Remove(transaction);
-                await _context.SaveChangesAsync();
+                var strategy = _context.Database.CreateExecutionStrategy();
+
+                await strategy.ExecuteAsync(async () =>
+                {
+                    using var transaction = await _context.Database.BeginTransactionAsync();
+                    try
+                    {
+                        var transactionToDelete = await _context.Transactions
+                            .FirstOrDefaultAsync(t => t.TransactionId == transactionId && t.UserId == userId);
+
+                        if (transactionToDelete != null)
+                        {
+                            _context.Transactions.Remove(transactionToDelete);
+                            await _context.SaveChangesAsync();
+                            await transaction.CommitAsync();
+                            _logger.LogInformation("Transaction {TransactionId} deleted successfully", transactionId);
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting transaction: {TransactionId}", transactionId);
+                throw;
             }
         }
 

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using FinanceManager.Services;
 using Microsoft.AspNetCore.Authorization;
 using FinanceManager.Models;
+using Microsoft.Extensions.Logging;
 
 namespace FinanceManager.Controllers
 {

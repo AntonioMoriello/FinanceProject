@@ -56,6 +56,7 @@ namespace FinanceManager.Models.ViewModels
         public Budget Budget { get; set; }
         public decimal SpendingPercentage { get; set; }
         public decimal RemainingAmount { get; set; }
+        public decimal TotalSpent { get; set; }  // Add this property
         public IEnumerable<Transaction> RecentTransactions { get; set; }
     }
 }

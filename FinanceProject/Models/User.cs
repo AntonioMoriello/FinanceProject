@@ -11,16 +11,16 @@ namespace FinanceManager.Models
         [Required]
         [StringLength(50)]
         [Display(Name = "Username")]
-        public string Username { get; set; }
+        public string Username { get; set; } = string.Empty;
 
         [Required]
         [EmailAddress]
         [StringLength(100)]
-        public string Email { get; set; }
+        public string Email { get; set; } = string.Empty;
 
         [Required]
         [StringLength(100)]
-        public string PasswordHash { get; set; }
+        public string PasswordHash { get; set; } = string.Empty;
 
         public string? SecurityStamp { get; set; }
 
@@ -36,9 +36,14 @@ namespace FinanceManager.Models
 
         public bool IsActive { get; set; } = true;
 
-        // Navigation properties
+        // Navigation properties with explicit delete behavior
+        [InverseProperty("User")]
         public virtual ICollection<Transaction> Transactions { get; set; }
+
+        [InverseProperty("User")]
         public virtual ICollection<Budget> Budgets { get; set; }
+
+        [InverseProperty("User")]
         public virtual ICollection<Goal> Goals { get; set; }
 
         public User()

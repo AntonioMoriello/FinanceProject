@@ -1,0 +1,50 @@
+﻿<!-- Delete.cshtml for Budgets -->
+@model Budget
+
+@{
+    ViewData["Title"] = "Delete Budget";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="card-title mb-0">Delete Budget</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h5>Are you sure you want to delete this budget?</h5>
+                        <p>This action cannot be undone.</p>
+                    </div>
+
+                    <dl class="row">
+                        <dt class="col-sm-4">Name</dt>
+                        <dd class="col-sm-8">@Model.Name</dd>
+
+                        <dt class="col-sm-4">Amount</dt>
+                        <dd class="col-sm-8">@Model.Amount.ToString("C")</dd>
+
+                        <dt class="col-sm-4">Category</dt>
+                        <dd class="col-sm-8">@Model.Category.Name</dd>
+
+                        <dt class="col-sm-4">Period</dt>
+                        <dd class="col-sm-8">@Model.Period</dd>
+                    </dl>
+
+                    <form asp-action="Delete" method="post">
+                        <input type="hidden" asp-for="BudgetId" />
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Delete Budget
+                            </button>
+                            <a asp-action="Index" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Back to List
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

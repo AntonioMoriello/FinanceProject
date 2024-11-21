@@ -30,45 +30,98 @@ namespace FinanceManager.Services
 
         public async Task<(bool success, string message, int userId)> RegisterUserAsync(User user, string password)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                // Validate unique email
-                if (await _context.Users.AnyAsync(u => u.Email == user.Email))
-                    return (false, "Email already exists", 0);
-
-                // Validate unique username
-                if (await _context.Users.AnyAsync(u => u.Username == user.Username))
-                    return (false, "Username already exists", 0);
-
-                // Hash password
-                user.PasswordHash = HashPassword(password);
-                user.SecurityStamp = Guid.NewGuid().ToString();
-                user.CreatedDate = DateTime.UtcNow;
-                user.IsActive = true;
-
-                _context.Users.Add(user);
-                await _context.SaveChangesAsync();
-
-                // Create default categories for the user
-                var defaultCategories = new[]
+                // First check if database connection is working
+                if (!await _context.Database.CanConnectAsync())
                 {
-                new Category { Name = "Entertainment", Type = CategoryType.Expense, UserId = user.UserId },
-                new Category { Name = "Healthcare", Type = CategoryType.Expense, UserId = user.UserId },
-                new Category { Name = "Shopping", Type = CategoryType.Expense, UserId = user.UserId }
-            };
+                    _logger.LogError("Cannot connect to database");
+                    return (false, "Unable to connect to database. Please contact administrator.", 0);
+                }
 
-                _context.Categories.AddRange(defaultCategories);
-                await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
+                // Create an execution strategy
+                var strategy = _context.Database.CreateExecutionStrategy();
 
-                return (true, "Registration successful", user.UserId);
+                return await strategy.ExecuteAsync(async () =>
+                {
+                    // Check for existing email and username before starting transaction
+                    var existingEmail = await _context.Users
+                        .AnyAsync(u => u.Email.ToLower() == user.Email.ToLower());
+                    if (existingEmail)
+                    {
+                        _logger.LogWarning("Registration attempt with existing email: {Email}", user.Email);
+                        return (false, "This email address is already registered.", 0);
+                    }
+
+                    var existingUsername = await _context.Users
+                        .AnyAsync(u => u.Username.ToLower() == user.Username.ToLower());
+                    if (existingUsername)
+                    {
+                        _logger.LogWarning("Registration attempt with existing username: {Username}", user.Username);
+                        return (false, "This username is already taken.", 0);
+                    }
+
+                    using (var transaction = await _context.Database.BeginTransactionAsync())
+                    {
+                        try
+                        {
+                            // Hash password and set user properties
+                            user.PasswordHash = HashPassword(password);
+                            user.SecurityStamp = Guid.NewGuid().ToString();
+                            user.CreatedDate = DateTime.UtcNow;
+                            user.IsActive = true;
+
+                            // Add user
+                            _context.Users.Add(user);
+                            await _context.SaveChangesAsync();
+
+                            // Create default categories for the user
+                            var defaultCategories = new[]
+                            {
+                        new Category {
+                            Name = "Entertainment",
+                            Description = "Entertainment expenses",
+                            Type = CategoryType.Expense,
+                            UserId = user.UserId,
+                            ColorCode = "#FF4081"
+                        },
+                        new Category {
+                            Name = "Healthcare",
+                            Description = "Healthcare expenses",
+                            Type = CategoryType.Expense,
+                            UserId = user.UserId,
+                            ColorCode = "#2196F3"
+                        },
+                        new Category {
+                            Name = "Shopping",
+                            Description = "Shopping expenses",
+                            Type = CategoryType.Expense,
+                            UserId = user.UserId,
+                            ColorCode = "#4CAF50"
+                        }
+                    };
+
+                            _context.Categories.AddRange(defaultCategories);
+                            await _context.SaveChangesAsync();
+
+                            await transaction.CommitAsync();
+
+                            _logger.LogInformation("User registered successfully: {UserId}", user.UserId);
+                            return (true, "Registration successful", user.UserId);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error during registration transaction for user {Email}", user.Email);
+                            await transaction.RollbackAsync();
+                            throw;
+                        }
+                    }
+                });
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
                 _logger.LogError(ex, "Error registering user: {Email}", user.Email);
-                return (false, "Registration failed. Please try again.", 0);
+                return (false, "An error occurred during registration. Please try again.", 0);
             }
         }
 

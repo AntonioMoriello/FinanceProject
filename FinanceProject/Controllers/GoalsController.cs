@@ -6,6 +6,7 @@ using FinanceManager.Models.ViewModels;
 using FinanceManager.Services;
 using FinanceManager.Data;
 using System.Security.Claims;
+using Microsoft.Extensions.Logging;
 
 namespace FinanceManager.Controllers
 {
@@ -192,6 +193,7 @@ namespace FinanceManager.Controllers
             if (goal == null)
                 return NotFound();
 
+            // No navigation properties needed for Goals delete view
             return View(goal);
         }
 
@@ -200,10 +202,23 @@ namespace FinanceManager.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var userId = GetUserId();
-            await _goalService.DeleteGoalAsync(id, userId);
-            TempData["SuccessMessage"] = "Goal deleted successfully!";
-            return RedirectToAction(nameof(Index));
+            try
+            {
+                var userId = GetUserId();
+                var goal = await _goalService.GetGoalByIdAsync(id, userId);
+
+                if (goal == null)
+                    return NotFound();
+
+                await _goalService.DeleteGoalAsync(id, userId);
+                TempData["SuccessMessage"] = "Goal deleted successfully!";
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = "Error deleting goal. Please try again.";
+                return RedirectToAction(nameof(Delete), new { id });
+            }
         }
 
         // POST: Goals/UpdateProgress/5

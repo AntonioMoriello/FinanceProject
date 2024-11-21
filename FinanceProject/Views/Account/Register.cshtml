@@ -12,8 +12,23 @@
                     <h4 class="card-title mb-0">Create a New Account</h4>
                 </div>
                 <div class="card-body">
-                    <form asp-action="Register" method="post">
-                        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="alert alert-danger">
+                            <ul>
+                                @foreach (var modelState in ViewData.ModelState.Values)
+                                {
+                                    foreach (var error in modelState.Errors)
+                                    {
+                                        <li>@error.ErrorMessage</li>
+                                    }
+                                }
+                            </ul>
+                        </div>
+                    }
+
+                    <form asp-action="Register" method="post" id="registerForm">
+                        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
@@ -31,25 +46,25 @@
 
                         <div class="mb-3">
                             <label asp-for="Username" class="form-label"></label>
-                            <input asp-for="Username" class="form-control" />
+                            <input asp-for="Username" class="form-control" required />
                             <span asp-validation-for="Username" class="text-danger"></span>
                         </div>
 
                         <div class="mb-3">
                             <label asp-for="Email" class="form-label"></label>
-                            <input asp-for="Email" class="form-control" />
+                            <input asp-for="Email" class="form-control" required />
                             <span asp-validation-for="Email" class="text-danger"></span>
                         </div>
 
                         <div class="mb-3">
                             <label asp-for="Password" class="form-label"></label>
-                            <input asp-for="Password" class="form-control" />
+                            <input asp-for="Password" class="form-control" required />
                             <span asp-validation-for="Password" class="text-danger"></span>
                         </div>
 
                         <div class="mb-3">
                             <label asp-for="ConfirmPassword" class="form-label"></label>
-                            <input asp-for="ConfirmPassword" class="form-control" />
+                            <input asp-for="ConfirmPassword" class="form-control" required />
                             <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
                         </div>
 
@@ -71,4 +86,11 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        $(document).ready(function() {
+            $("#registerForm").on("submit", function() {
+                console.log("Form submitted");
+            });
+        });
+    </script>
 }

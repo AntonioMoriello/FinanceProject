@@ -104,14 +104,50 @@ namespace FinanceManager.Services
         {
             try
             {
-                var goal = await _context.Goals
-                    .FirstOrDefaultAsync(g => g.GoalId == goalId && g.UserId == userId);
+                // Create an execution strategy
+                var strategy = _context.Database.CreateExecutionStrategy();
 
-                if (goal != null)
+                await strategy.ExecuteAsync(async () =>
                 {
-                    _context.Goals.Remove(goal);
-                    await _context.SaveChangesAsync();
-                }
+                    using var transaction = await _context.Database.BeginTransactionAsync();
+                    try
+                    {
+                        var goal = await _context.Goals
+                            .Include(g => g.User)
+                            .FirstOrDefaultAsync(g => g.GoalId == goalId && g.UserId == userId);
+
+                        if (goal != null)
+                        {
+                            // Get all transactions related to this goal
+                            var relatedTransactions = await _context.Transactions
+                                .Where(t => t.Description.Contains($"Contribution to goal: {goal.Name}"))
+                                .ToListAsync();
+
+                            // Remove related transactions first
+                            if (relatedTransactions.Any())
+                            {
+                                _context.Transactions.RemoveRange(relatedTransactions);
+                            }
+
+                            // Then remove the goal
+                            _context.Goals.Remove(goal);
+
+                            await _context.SaveChangesAsync();
+                            await transaction.CommitAsync();
+
+                            _logger.LogInformation("Goal {GoalId} and its related data deleted successfully", goalId);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Attempt to delete non-existent goal: {GoalId}", goalId);
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                });
             }
             catch (Exception ex)
             {

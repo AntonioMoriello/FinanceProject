@@ -21,17 +21,17 @@ namespace FinanceManager.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // Configure decimal properties to use TEXT in SQLite
-            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            foreach (var entity in modelBuilder.Model.GetEntityTypes())
             {
-                var properties = entityType.ClrType.GetProperties()
+                // Configure decimal properties to use decimal(18,2)
+                var properties = entity.ClrType.GetProperties()
                     .Where(p => p.PropertyType == typeof(decimal) || p.PropertyType == typeof(decimal?));
 
                 foreach (var property in properties)
                 {
-                    modelBuilder.Entity(entityType.Name)
+                    modelBuilder.Entity(entity.Name)
                         .Property(property.Name)
-                        .HasConversion<double>();
+                        .HasColumnType("decimal(18,2)");
                 }
             }
 

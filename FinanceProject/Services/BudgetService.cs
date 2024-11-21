@@ -128,6 +128,11 @@ namespace FinanceManager.Services
                 {
                     _context.Budgets.Remove(budget);
                     await _context.SaveChangesAsync();
+                    _logger.LogInformation("Budget {BudgetId} deleted successfully", budgetId);
+                }
+                else
+                {
+                    _logger.LogWarning("Attempt to delete non-existent budget: {BudgetId}", budgetId);
                 }
             }
             catch (Exception ex)
